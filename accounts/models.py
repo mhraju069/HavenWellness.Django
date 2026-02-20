@@ -31,11 +31,13 @@ class UserManager(BaseUserManager):
 
 class User(AbstractBaseUser, PermissionsMixin):
     ROLE = (('user', 'User'),('admin', 'Admin'),)
+    LANGUAGE = (('en', 'English'),('de', 'German'),('nl', 'Dutch'))
+    
     email = models.EmailField(max_length=255,unique=True,verbose_name="User Email")
     name = models.CharField(max_length=200, blank=True, null=True,verbose_name="User Name")
     bio = models.TextField(blank=True, null=True,verbose_name="User Bio")
-    cover = models.ImageField(upload_to='cover_images/', blank=True, null=True,)
     image = models.ImageField(upload_to='profile_images/', blank=True, null=True,)
+    language = models.CharField(max_length=10,choices=LANGUAGE,default="en",verbose_name="Language")
     role = models.CharField(max_length=10, choices=ROLE, default='user',verbose_name="User Role")
     is_active = models.BooleanField(default=False,verbose_name="Active User")
     is_staff = models.BooleanField(default=False,verbose_name="Staff User")
