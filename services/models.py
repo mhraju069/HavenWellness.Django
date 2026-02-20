@@ -9,7 +9,7 @@ class Service(models.Model):
         ('shared_sauna', 'Shared Sauna'),
         ('arrangement', 'Arrangement'),
         ('activity', 'Activity'),
-        ('restaurant', 'Restaurant'),
+        ('lunchroom', 'Lunchroom'),
     ]
     PAYMENT_TYPE_CHOICES = [
         ('full', 'Full Payment'),
