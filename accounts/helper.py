@@ -3,18 +3,21 @@ from datetime import timedelta
 from .models import OTP, User
 from django.core.mail import send_mail
 from django.conf import settings
+from django.template.loader import render_to_string
 import json
 
-def send_otp(email, task="verification"):
+def send_otp(email):
     try:
         user = User.objects.get(email=email)
         otp_obj = OTP.generate_otp(user)
         
-        subject = f"Your OTP for {task}"
-        message = f"Your OTP code is {otp_obj.otp}. It will expire in 3 minutes."
+        subject = f"Your OTP for email verification"
         email_from = settings.EMAIL_HOST_USER
         recipient_list = [email]
         
+        message = render_to_string('email/otp_email.html', {
+            'otp': otp_obj.otp,
+        })
         send_mail(subject, message, email_from, recipient_list)
         
         return {"status": True, "log": f"OTP sent successfully to {email}"}

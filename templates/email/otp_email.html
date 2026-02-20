@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Haven Wellness • Your OTP Code</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #f5f0eb;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 24px;
+            line-height: 1.5;
+            color: #2e2a27;
+        }
+
+        .email-container {
+            max-width: 520px;
+            width: 100%;
+            background-color: #ffffff;
+            border-radius: 32px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(207, 185, 163, 0.2);
+            overflow: hidden;
+        }
+
+        .email-card {
+            padding: 40px 36px 44px;
+            background: white;
+            position: relative;
+        }
+
+        .brand-accent {
+            height: 4px;
+            background: linear-gradient(90deg, #cfb9a3 0%, #e1d2c2 70%, #f0e7de 100%);
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .logo-area {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #cfb9a3;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            margin-bottom: 12px;
+            box-shadow: 0 10px 20px -8px rgba(207, 185, 163, 0.4);
+        }
+
+        .logo-icon span {
+            font-size: 32px;
+            filter: brightness(0.95);
+            color: #ffffff;
+        }
+
+        .brand-name {
+            font-size: 22px;
+            font-weight: 350;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            color: #4a4540;
+        }
+
+        .brand-name span {
+            font-weight: 500;
+            color: #7b6b5c;
+        }
+
+        .brand-name strong {
+            font-weight: 600;
+            color: #a58c78;
+        }
+
+        .greeting {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .greeting h1 {
+            font-size: 26px;
+            font-weight: 340;
+            color: #332e2a;
+            margin-bottom: 8px;
+        }
+
+        .greeting p {
+            color: #6b625b;
+            font-size: 16px;
+            font-weight: 350;
+            max-width: 320px;
+            margin: 0 auto;
+        }
+
+        .otp-container {
+            background-color: #fcf9f7;
+            border-radius: 28px;
+            padding: 32px 24px;
+            margin: 24px 0 28px;
+            border: 1px solid #ede3db;
+            box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.8), 0 6px 14px rgba(190, 165, 145, 0.08);
+        }
+
+        .otp-label {
+            text-align: center;
+            font-size: 15px;
+            font-weight: 400;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #8e7e71;
+            margin-bottom: 18px;
+        }
+
+        .otp-code {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .otp-digit {
+            width: 50px;
+            height: 60px;
+            background: white;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: 480;
+            color: #2c2824;
+            box-shadow: 0 6px 12px -6px rgba(162, 138, 118, 0.3), 0 0 0 1px rgba(207, 185, 163, 0.5);
+            line-height: 1;
+            transition: all 0.15s ease;
+            border: 1px solid rgba(207, 185, 163, 0.3);
+            background: linear-gradient(145deg, #ffffff, #fefcfb);
+        }
+
+        .validity {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 28px 0 16px;
+            color: #8e7c6e;
+            font-size: 15px;
+            font-weight: 380;
+            background: #f2ebe5;
+            padding: 12px 16px;
+            border-radius: 60px;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .validity svg {
+            opacity: 0.7;
+        }
+
+        .validity span {
+            font-weight: 500;
+            color: #6f5e50;
+        }
+
+        .message {
+            text-align: center;
+            color: #5c534c;
+            font-size: 15px;
+            margin: 20px 0 14px;
+            padding: 0 10px;
+        }
+
+        .message span {
+            color: #b29781;
+            font-weight: 500;
+            text-decoration: none;
+        }
+
+        .divider {
+            margin: 30px 0 24px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #cfb9a3 30%, #cfb9a3 70%, transparent);
+            opacity: 0.4;
+        }
+
+        .footer {
+            text-align: center;
+            color: #9e9289;
+            font-size: 14px;
+            font-weight: 350;
+        }
+
+        .footer p {
+            margin-bottom: 6px;
+        }
+
+        .footer .brand-small {
+            font-weight: 500;
+            color: #b09a86;
+            letter-spacing: 0.5px;
+        }
+
+        .footer .luxury-note {
+            font-size: 12px;
+            margin-top: 20px;
+            color: #b7aa9f;
+        }
+
+        @media (max-width: 450px) {
+            .email-card {
+                padding: 32px 20px 36px;
+            }
+
+            .otp-digit {
+                width: 40px;
+                height: 50px;
+                font-size: 32px;
+            }
+
+            .otp-container {
+                padding: 24px 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="email-container">
+        <div class="email-card">
+            <div class="brand-accent"></div>
+
+            <!-- Logo / brand block -->
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <span>⋆˛⋆</span>
+                </div>
+                <div class="brand-name">
+                    <span>haven</span> <strong>wellness</strong>
+                </div>
+            </div>
+
+            <!-- Greeting -->
+            <div class="greeting">
+                <h1>Email Verification</h1>
+                <p>Your secure one‑time code</p>
+            </div>
+
+            <!-- OTP premium block -->
+            <div class="otp-container">
+                <div class="otp-label">verification code</div>
+                <div class="otp-code">
+                    <!-- Dynamically split the 6-digit OTP into individual digits -->
+                    {% for digit in otp|make_list %}
+                    <div class="otp-digit">{{ digit }}</div>
+                    {% endfor %}
+                </div>
+
+                <!-- elegant validity indicator -->
+                <div class="validity">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="9" stroke="#b7a085" stroke-width="1.2" stroke-linecap="round" />
+                        <path d="M12 7V12L15 15" stroke="#b7a085" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                    <span>valid for 5 minutes</span>
+                </div>
+            </div>
+
+            <!-- extra serenity message -->
+            <div class="message">
+                <span style="opacity: 0.9;">✻ enter this code to verify your email ✻</span>
+            </div>
+
+            <!-- subtle contact hint -->
+            <div class="message" style="margin-top: 0;">
+                Not expecting this? <span>Just ignore this email.</span>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- footer with haven wellness signature -->
+            <div class="footer">
+                <p class="brand-small">haven wellness · harmony in detail</p>
+                <p style="margin-top: 12px;">123 serenity lane, wellness valley</p>
+                <p style="margin-top: 2px;">support@havenwellness.com | +1 (800) 669-8812</p>
+                <div class="luxury-note">
+                    ⋆｡°✩ pure relaxation, one tap away ✩°｡⋆
+                </div>
+                <div style="margin-top: 18px; font-size: 11px; color: #c9bbae;">
+                    © haven wellness — crafted with intent
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
