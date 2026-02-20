@@ -11,6 +11,11 @@ class Service(models.Model):
         ('activity', 'Activity'),
         ('restaurant', 'Restaurant'),
     ]
+    PAYMENT_TYPE_CHOICES = [
+        ('full', 'Full Payment'),
+        ('partial', 'Partial Payment'),
+        ('on_spot', 'On Spot Payment'),
+    ]
     title = models.CharField(max_length=100)
     subtitle = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField()
@@ -18,6 +23,7 @@ class Service(models.Model):
     duration = models.IntegerField(default=60)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='private_sauna')
+    payment_type = models.CharField(max_length=20, choices=PAYMENT_TYPE_CHOICES, default='full')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -35,3 +41,13 @@ class ServiceImage(models.Model):
 
     def __str__(self):
         return f"Image for {self.service.title} | {self.service.type}"
+
+
+class ServiceFeature(models.Model):
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='features')
+    feature = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Feature for {self.service.title} | {self.feature}"
