@@ -32,7 +32,7 @@ class UserManager(BaseUserManager):
 class User(AbstractBaseUser, PermissionsMixin):
     ROLE = (('user', 'User'),('admin', 'Admin'),)
     LANGUAGE = (('en', 'English'),('de', 'German'),('nl', 'Dutch'))
-    
+
     email = models.EmailField(max_length=255,unique=True,verbose_name="User Email")
     name = models.CharField(max_length=200, blank=True, null=True,verbose_name="User Name")
     bio = models.TextField(blank=True, null=True,verbose_name="User Bio")
@@ -91,7 +91,7 @@ class OTP(models.Model):
 
     @staticmethod
     def generate_otp(user):
-        otp_code = str(random.randint(1000, 9999))
+        otp_code = str(random.randint(100000, 999999))
         return OTP.objects.create(user=user, otp=otp_code)
 
     def is_expired(self):
