@@ -5,6 +5,16 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.template.loader import render_to_string
 import json
+import requests
+from django.contrib.auth.hashers import make_password
+from django.utils.text import slugify
+from django.core.files.base import ContentFile
+import jwt
+try:
+    from jwt.algorithms import RSAAlgorithm
+except ImportError:
+    RSAAlgorithm = None
+from rest_framework.response import Response
 
 def send_otp(email):
     try:
@@ -15,10 +25,11 @@ def send_otp(email):
         email_from = settings.EMAIL_HOST_USER
         recipient_list = [email]
         
-        message = render_to_string('email/otp_email.html', {
+        html_message = render_to_string('email/otp_email.html', {
             'otp': otp_obj.otp,
         })
-        send_mail(subject, message, email_from, recipient_list)
+        plain_message = f"Your OTP for email verification is: {otp_obj.otp}"
+        send_mail(subject, plain_message, email_from, recipient_list, html_message=html_message)
         
         return {"status": True, "log": f"OTP sent successfully to {email}"}
     except User.DoesNotExist:

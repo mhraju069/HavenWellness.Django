@@ -6,309 +6,250 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Haven Wellness • Your OTP Code</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
+        /* Email client reset */
+        .ExternalClass,
+        .ReadMsgBody {
+            width: 100%;
             background-color: #f5f0eb;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 24px;
-            line-height: 1.5;
-            color: #2e2a27;
         }
 
-        .email-container {
-            max-width: 520px;
-            width: 100%;
-            background-color: #ffffff;
-            border-radius: 32px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(207, 185, 163, 0.2);
-            overflow: hidden;
-        }
-
-        .email-card {
-            padding: 40px 36px 44px;
-            background: white;
-            position: relative;
-        }
-
-        .brand-accent {
-            height: 4px;
-            background: linear-gradient(90deg, #cfb9a3 0%, #e1d2c2 70%, #f0e7de 100%);
-            width: 100%;
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-
-        .logo-area {
-            text-align: center;
-            margin-bottom: 32px;
-        }
-
-        .logo-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background-color: #cfb9a3;
-            width: 64px;
-            height: 64px;
-            border-radius: 50%;
-            margin-bottom: 12px;
-            box-shadow: 0 10px 20px -8px rgba(207, 185, 163, 0.4);
-        }
-
-        .logo-icon span {
-            font-size: 32px;
-            filter: brightness(0.95);
-            color: #ffffff;
-        }
-
-        .brand-name {
-            font-size: 22px;
-            font-weight: 350;
-            letter-spacing: 1.2px;
-            text-transform: uppercase;
-            color: #4a4540;
-        }
-
-        .brand-name span {
-            font-weight: 500;
-            color: #7b6b5c;
-        }
-
-        .brand-name strong {
-            font-weight: 600;
-            color: #a58c78;
-        }
-
-        .greeting {
-            text-align: center;
-            margin-bottom: 24px;
-        }
-
-        .greeting h1 {
-            font-size: 26px;
-            font-weight: 340;
-            color: #332e2a;
-            margin-bottom: 8px;
-        }
-
-        .greeting p {
-            color: #6b625b;
-            font-size: 16px;
-            font-weight: 350;
-            max-width: 320px;
-            margin: 0 auto;
-        }
-
-        .otp-container {
-            background-color: #fcf9f7;
-            border-radius: 28px;
-            padding: 32px 24px;
-            margin: 24px 0 28px;
-            border: 1px solid #ede3db;
-            box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.8), 0 6px 14px rgba(190, 165, 145, 0.08);
-        }
-
-        .otp-label {
-            text-align: center;
-            font-size: 15px;
-            font-weight: 400;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            color: #8e7e71;
-            margin-bottom: 18px;
-        }
-
-        .otp-code {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .otp-digit {
-            width: 50px;
-            height: 60px;
-            background: white;
-            border-radius: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-            font-weight: 480;
-            color: #2c2824;
-            box-shadow: 0 6px 12px -6px rgba(162, 138, 118, 0.3), 0 0 0 1px rgba(207, 185, 163, 0.5);
-            line-height: 1;
-            transition: all 0.15s ease;
-            border: 1px solid rgba(207, 185, 163, 0.3);
-            background: linear-gradient(145deg, #ffffff, #fefcfb);
-        }
-
-        .validity {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            margin: 28px 0 16px;
-            color: #8e7c6e;
-            font-size: 15px;
-            font-weight: 380;
-            background: #f2ebe5;
-            padding: 12px 16px;
-            border-radius: 60px;
-            width: fit-content;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        .validity svg {
-            opacity: 0.7;
-        }
-
-        .validity span {
-            font-weight: 500;
-            color: #6f5e50;
-        }
-
-        .message {
-            text-align: center;
-            color: #5c534c;
-            font-size: 15px;
-            margin: 20px 0 14px;
-            padding: 0 10px;
-        }
-
-        .message span {
-            color: #b29781;
-            font-weight: 500;
+        /* Fix for Gmail and other email clients */
+        u+#body a {
+            color: inherit;
             text-decoration: none;
-        }
-
-        .divider {
-            margin: 30px 0 24px;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, #cfb9a3 30%, #cfb9a3 70%, transparent);
-            opacity: 0.4;
-        }
-
-        .footer {
-            text-align: center;
-            color: #9e9289;
-            font-size: 14px;
-            font-weight: 350;
-        }
-
-        .footer p {
-            margin-bottom: 6px;
-        }
-
-        .footer .brand-small {
-            font-weight: 500;
-            color: #b09a86;
-            letter-spacing: 0.5px;
-        }
-
-        .footer .luxury-note {
-            font-size: 12px;
-            margin-top: 20px;
-            color: #b7aa9f;
-        }
-
-        @media (max-width: 450px) {
-            .email-card {
-                padding: 32px 20px 36px;
-            }
-
-            .otp-digit {
-                width: 40px;
-                height: 50px;
-                font-size: 32px;
-            }
-
-            .otp-container {
-                padding: 24px 16px;
-            }
+            font-size: inherit;
+            font-family: inherit;
+            font-weight: inherit;
+            line-height: inherit;
         }
     </style>
+    <!--[if (gte mso 9)|(IE)]>
+    <xml>
+        <o:OfficeDocumentSettings>
+            <o:PixelsPerInch>96</o:PixelsPerInch>
+        </o:OfficeDocumentSettings>
+    </xml>
+    <![endif]-->
 </head>
 
-<body>
-    <div class="email-container">
-        <div class="email-card">
-            <div class="brand-accent"></div>
+<body
+    style="margin: 0; padding: 0; background-color: #f5f0eb; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; font-smoothing: antialiased; width: 100%;">
 
-            <!-- Logo / brand block -->
-            <div class="logo-area">
-                <div class="logo-icon">
-                    <span>⋆˛⋆</span>
-                </div>
-                <div class="brand-name">
-                    <span>haven</span> <strong>wellness</strong>
-                </div>
-            </div>
+    <!-- Gmail-friendly centered container -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" align="center" bgcolor="#f5f0eb"
+        style="background-color: #f5f0eb; width: 100%; max-width: 100%;">
+        <tr>
+            <td align="center" valign="top" style="padding: 20px 10px;">
 
-            <!-- Greeting -->
-            <div class="greeting">
-                <h1>Email Verification</h1>
-                <p>Your secure one‑time code</p>
-            </div>
+                <!-- Main email container -->
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" align="center"
+                    style="max-width: 520px; width: 100%; background-color: #ffffff; border-radius: 32px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15); border: 1px solid rgba(207, 185, 163, 0.2);">
+                    <tr>
+                        <td style="border-radius: 32px; overflow: hidden;">
 
-            <!-- OTP premium block -->
-            <div class="otp-container">
-                <div class="otp-label">verification code</div>
-                <div class="otp-code">
-                    <!-- Dynamically split the 6-digit OTP into individual digits -->
-                    {% for digit in otp|make_list %}
-                    <div class="otp-digit">{{ digit }}</div>
-                    {% endfor %}
-                </div>
+                            <!-- Premium accent line -->
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td height="4" bgcolor="#cfb9a3"
+                                        style="height: 4px; background: linear-gradient(90deg, #cfb9a3 0%, #e1d2c2 70%, #f0e7de 100%); font-size: 0; line-height: 0;">
+                                        &nbsp;</td>
+                                </tr>
+                            </table>
 
-                <!-- elegant validity indicator -->
-                <div class="validity">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="12" cy="12" r="9" stroke="#b7a085" stroke-width="1.2" stroke-linecap="round" />
-                        <path d="M12 7V12L15 15" stroke="#b7a085" stroke-width="1.5" stroke-linecap="round" />
-                    </svg>
-                    <span>valid for 5 minutes</span>
-                </div>
-            </div>
+                            <!-- Main content -->
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                                style="padding: 40px 36px 44px;">
+                                <tr>
+                                    <td style="padding: 0;">
 
-            <!-- extra serenity message -->
-            <div class="message">
-                <span style="opacity: 0.9;">✻ enter this code to verify your email ✻</span>
-            </div>
+                                        <!-- Logo area - centered -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td align="center" style="padding-bottom: 28px;">
+                                                    <table cellpadding="0" cellspacing="0" border="0">
+                                                        <tr>
+                                                            <td align="center" bgcolor="#cfb9a3" width="64" height="64"
+                                                                style="width: 64px; height: 64px; background-color: #cfb9a3; border-radius: 50%; text-align: center; vertical-align: middle; box-shadow: 0 10px 20px -8px rgba(207, 185, 163, 0.4);">
+                                                                <span
+                                                                    style="font-size: 32px; line-height: 64px; color: #ffffff; display: block;">⋆˛⋆</span>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td align="center" style="padding-top: 12px;">
+                                                                <span
+                                                                    style="font-size: 22px; font-weight: 350; letter-spacing: 1.2px; text-transform: uppercase; color: #4a4540;">haven
+                                                                    <strong
+                                                                        style="font-weight: 600; color: #a58c78;">wellness</strong></span>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
 
-            <!-- subtle contact hint -->
-            <div class="message" style="margin-top: 0;">
-                Not expecting this? <span>Just ignore this email.</span>
-            </div>
+                                        <!-- Greeting -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td align="center" style="padding-bottom: 20px;">
+                                                    <h1
+                                                        style="font-size: 26px; font-weight: 340; color: #332e2a; margin: 0 0 6px 0;">
+                                                        email verification</h1>
+                                                    <p
+                                                        style="color: #6b625b; font-size: 16px; font-weight: 350; margin: 0;">
+                                                        Your secure one‑time code</p>
+                                                </td>
+                                            </tr>
+                                        </table>
 
-            <div class="divider"></div>
+                                        <!-- OTP Container -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fcf9f7"
+                                            style="background-color: #fcf9f7; border-radius: 28px; border: 1px solid #ede3db; margin: 20px 0 24px 0;">
+                                            <tr>
+                                                <td style="padding: 28px 20px;">
 
-            <!-- footer with haven wellness signature -->
-            <div class="footer">
-                <p class="brand-small">haven wellness · harmony in detail</p>
-                <p style="margin-top: 12px;">123 serenity lane, wellness valley</p>
-                <p style="margin-top: 2px;">support@havenwellness.com | +1 (800) 669-8812</p>
-                <div class="luxury-note">
-                    ⋆｡°✩ pure relaxation, one tap away ✩°｡⋆
-                </div>
-                <div style="margin-top: 18px; font-size: 11px; color: #c9bbae;">
-                    © haven wellness — crafted with intent
-                </div>
-            </div>
-        </div>
-    </div>
+                                                    <!-- OTP Label -->
+                                                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                                        <tr>
+                                                            <td align="center"
+                                                                style="font-size: 15px; font-weight: 400; letter-spacing: 1px; text-transform: uppercase; color: #8e7e71; padding-bottom: 20px;">
+                                                                verification code</td>
+                                                        </tr>
+                                                    </table>
+
+                                                    <!-- OTP Digits - Centered with proper spacing -->
+                                                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                                        <tr>
+                                                            <td align="center">
+                                                                <table cellpadding="0" cellspacing="0" border="0"
+                                                                    align="center">
+                                                                    <tr>
+                                                                        <!-- Dynamic OTP digits -->
+                                                                        {% for digit in otp|make_list %}
+                                                                        <td align="center" valign="middle" width="52"
+                                                                            height="64"
+                                                                            style="width: 52px; height: 64px; background: white; border-radius: 16px; border: 1px solid rgba(207, 185, 163, 0.5); box-shadow: 0 8px 16px -8px rgba(162, 138, 118, 0.3); text-align: center; vertical-align: middle; font-size: 34px; font-weight: 500; color: #2c2824; line-height: 64px; margin: 0 5px;">
+                                                                            {{ digit }}
+                                                                        </td>
+                                                                        {% if not forloop.last %}
+                                                                        <td width="8" style="width: 8px;">&nbsp;</td>
+                                                                        {% endif %}
+                                                                        {% endfor %}
+                                                                    </tr>
+                                                                </table>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+
+                                                    <!-- Validity indicator -->
+                                                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                                        <tr>
+                                                            <td align="center" style="padding-top: 24px;">
+                                                                <table cellpadding="0" cellspacing="0" border="0"
+                                                                    bgcolor="#f2ebe5"
+                                                                    style="background-color: #f2ebe5; border-radius: 60px;">
+                                                                    <tr>
+                                                                        <td style="padding: 10px 18px;">
+                                                                            <table cellpadding="0" cellspacing="0"
+                                                                                border="0" align="center">
+                                                                                <tr>
+                                                                                    <td valign="middle"
+                                                                                        style="vertical-align: middle; padding-right: 8px;">
+                                                                                        <svg width="20" height="20"
+                                                                                            viewBox="0 0 24 24"
+                                                                                            fill="none"
+                                                                                            xmlns="http://www.w3.org/2000/svg">
+                                                                                            <circle cx="12" cy="12"
+                                                                                                r="9" stroke="#b7a085"
+                                                                                                stroke-width="1.2"
+                                                                                                stroke-linecap="round" />
+                                                                                            <path d="M12 7V12L15 15"
+                                                                                                stroke="#b7a085"
+                                                                                                stroke-width="1.5"
+                                                                                                stroke-linecap="round" />
+                                                                                        </svg>
+                                                                                    </td>
+                                                                                    <td valign="middle"
+                                                                                        style="vertical-align: middle; color: #6f5e50; font-size: 15px; font-weight: 500; white-space: nowrap;">
+                                                                                        valid for 5 minutes</td>
+                                                                                </tr>
+                                                                            </table>
+                                                                        </td>
+                                                                    </tr>
+                                                                </table>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- Serenity message -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td align="center"
+                                                    style="color: #5c534c; font-size: 15px; padding: 8px 0 8px;">
+                                                    <span style="opacity: 0.9;">✻ enter this code to verify your email
+                                                        ✻</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td align="center"
+                                                    style="color: #5c534c; font-size: 15px; padding: 0 0 16px;">
+                                                    Not expecting this? <span
+                                                        style="color: #b29781; font-weight: 500;">Just ignore this
+                                                        email.</span>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- Divider -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td height="1" bgcolor="#cfb9a3"
+                                                    style="height: 1px; background: linear-gradient(90deg, transparent, #cfb9a3 30%, #cfb9a3 70%, transparent); font-size: 0; line-height: 0; opacity: 0.4; margin: 28px 0 22px;">
+                                                    &nbsp;</td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- Footer -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td align="center" style="color: #9e9289; font-size: 14px;">
+                                                    <p
+                                                        style="margin: 0 0 6px 0; font-weight: 500; color: #b09a86; letter-spacing: 0.5px;">
+                                                        haven wellness · harmony in detail</p>
+                                                    <p style="margin: 12px 0 2px 0;">123 serenity lane, wellness valley
+                                                    </p>
+                                                    <p style="margin: 2px 0 0 0;">support@havenwellness.com | +1 (800)
+                                                        669-8812</p>
+                                                    <p style="margin: 18px 0 0 0; font-size: 12px; color: #b7aa9f;">⋆｡°✩
+                                                        pure relaxation, one tap away ✩°｡⋆</p>
+                                                    <p style="margin: 18px 0 0 0; font-size: 11px; color: #c9bbae;">©
+                                                        haven wellness — crafted with intent</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                    </td>
+                                </tr>
+                            </table>
+
+                        </td>
+                    </tr>
+                </table>
+
+            </td>
+        </tr>
+    </table>
+
+    <!-- Fallback for Outlook and older email clients -->
+    <!--[if (gte mso 9)|(IE)]>
+    <style>
+        .otp-fallback td { border: 1px solid rgba(207, 185, 163, 0.5) !important; }
+    </style>
+    <![endif]-->
+
 </body>
 
 </html>

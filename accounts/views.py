@@ -64,7 +64,7 @@ class GetOtpView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        res = send_otp(email, task)
+        res = send_otp(email)
 
         if res['status']:
             return Response({"status": True, "log": res['log']}, status=status.HTTP_200_OK)

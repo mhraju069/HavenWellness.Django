@@ -95,6 +95,6 @@ class OTP(models.Model):
         return OTP.objects.create(user=user, otp=otp_code)
 
     def is_expired(self):
-        return self.created_at + timedelta(minutes=3) < timezone.now()
+        return self.created_at + timedelta(minutes=5) < timezone.now()
 
 
