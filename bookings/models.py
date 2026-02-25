@@ -77,6 +77,14 @@ class Booking(models.Model):
     def save(self, *args, **kwargs):
         if not self.booking_id:
             self.booking_id = f"BK-{self.id:03d}"
+        
+        if not self.name:
+            self.name = self.user.username
+        if not self.email:
+            self.email = self.user.email
+        if not self.phone:
+            self.phone = self.user.phone
+
         super().save(*args, **kwargs)
 
 
