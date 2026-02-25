@@ -24,8 +24,11 @@ class BookingSerializer(serializers.ModelSerializer):
         return booking
 
     def get_access_code(self,obj):
-        data = AccessCode.objects.get_or_create(booking=obj)
-        return AccessCodeSerializer(data[0]).data
+        service = obj.service
+        if service.title == "private_sauna" or service.title == "shared_sauna":
+            data = AccessCode.objects.get_or_create(booking=obj)
+            return AccessCodeSerializer(data[0]).data
+        return None
 
 
 class SlotSerializer(serializers.ModelSerializer):
