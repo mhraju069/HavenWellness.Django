@@ -2,7 +2,7 @@ from django.db import models
 from services.models import Service
 from datetime import timedelta
 from django.utils import timezone
-import random,string
+import random,string,ast
 from django.conf import settings
 User = settings.AUTH_USER_MODEL
 
@@ -49,7 +49,10 @@ class TimeSlot(models.Model):
     def available_capacity(self):
         return self.slot.max_capacity - self.booked_capacity
 
-
+    def get_time_display(self):
+        time_tuple = ast.literal_eval(self.time)
+        return time_tuple[0]
+        
 
 class Booking(models.Model):
     Status = [("pending", "Pending"), ("confirmed", "Confirmed"), ("cancelled", "Cancelled")]

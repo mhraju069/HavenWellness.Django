@@ -31,6 +31,7 @@ class SlotSerializer(serializers.ModelSerializer):
 
 class TimeSlotSerializer(serializers.ModelSerializer):
     available_capacity = serializers.SerializerMethodField()
+    time = serializers.CharField(source='get_time_display', read_only=True) 
     
     class Meta:
         model = TimeSlot
