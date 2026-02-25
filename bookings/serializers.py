@@ -3,6 +3,7 @@ from .models import *
 
 class BookingSerializer(serializers.ModelSerializer):
     guests_count = serializers.IntegerField()
+    access_code = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
@@ -21,6 +22,10 @@ class BookingSerializer(serializers.ModelSerializer):
         slot.save()
 
         return booking
+
+    def get_access_code(self,obj):
+        data = AccessCode.objects.get_or_create(booking=obj)
+        return AccessCodeSerializer(data[0]).data
 
 
 class SlotSerializer(serializers.ModelSerializer):

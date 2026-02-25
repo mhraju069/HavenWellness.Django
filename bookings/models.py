@@ -52,7 +52,7 @@ class TimeSlot(models.Model):
     def get_time_display(self):
         time_tuple = ast.literal_eval(self.time)
         return time_tuple[0]
-        
+
 
 class Booking(models.Model):
     Status = [("pending", "Pending"), ("confirmed", "Confirmed"), ("cancelled", "Cancelled")]
@@ -94,7 +94,7 @@ class Booking(models.Model):
 
 
 class AccessCode(models.Model):
-    booking = models.OneToOneField(Booking, on_delete=models.CASCADE)
+    booking = models.OneToOneField(Booking, on_delete=models.CASCADE,related_name="access_code")
     code = models.CharField(max_length=100, editable=False,unique=True,db_index=True)
     valid_from = models.DateTimeField(default=timezone.now)
     valid_until = models.DateTimeField()
@@ -107,7 +107,7 @@ class AccessCode(models.Model):
     
     def save(self, *args, **kwargs):
         if not self.code:
-            self.code = f"{random.choices(string.ascii_uppercase, k=3)}-{random.randint(1000, 9999)}"
+            self.code = f"{''.join(random.choices(string.ascii_uppercase, k=3))}-{random.randint(1000, 9999)}"
         self.valid_until = self.valid_from + timedelta(minutes=self.booking.service.duration)
         super().save(*args, **kwargs)
 
