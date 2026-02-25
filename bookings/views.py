@@ -8,6 +8,7 @@ from .models import *
 from rest_framework.permissions import IsAuthenticated
 from services.models import Service
 from core.permissions import IsAdmin
+from rest_framework import serializers
 # Create your views here.
 
 
@@ -19,7 +20,10 @@ class TimeSlotAPIView(generics.ListAPIView):
 
         date = self.request.query_params.get('date')
         service = self.request.query_params.get('service')
-        slot = Slot.objects.get(service__title=service)
+        slot = Slot.objects.filter(service__title=service).first()
+
+        if not slot:
+            raise serializers.ValidationError({"status":False,"log":"Slot not found"})
 
         if TimeSlot.objects.filter(date=date,slot=slot).exists():
             return TimeSlot.objects.filter(date=date,slot=slot)
@@ -28,3 +32,17 @@ class TimeSlotAPIView(generics.ListAPIView):
             TimeSlot.objects.create(date=date,time=time,slot=slot)
         
         return TimeSlot.objects.filter(date=date,slot=slot)
+
+
+class BookingAPIView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = BookingSerializer
+    
+    def get_queryset(self):
+        return Booking.objects.filter(user=self.request.user)
+    
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    
+
