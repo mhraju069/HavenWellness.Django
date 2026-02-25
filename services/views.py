@@ -14,7 +14,7 @@ class ServiceAPIView(ListCreateAPIView):
     serializer_class = ServiceSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['type']
+    filterset_fields = ['title']
 
     def get_queryset(self):
         return Service.objects.filter(is_active=True).order_by('-created_at')
