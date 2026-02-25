@@ -99,6 +99,7 @@ class AccessCode(models.Model):
     valid_from = models.DateTimeField(default=timezone.now)
     valid_until = models.DateTimeField()
     is_used = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -109,6 +110,12 @@ class AccessCode(models.Model):
         if not self.code:
             self.code = f"{''.join(random.choices(string.ascii_uppercase, k=3))}-{random.randint(1000, 9999)}"
         self.valid_until = self.valid_from + timedelta(minutes=self.booking.service.duration)
+
+        if self.valid_until > timezone.now():
+            self.is_active = False
+        else:
+            self.is_active = True
+
         super().save(*args, **kwargs)
 
 
