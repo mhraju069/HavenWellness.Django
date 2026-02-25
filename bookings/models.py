@@ -55,6 +55,11 @@ class Booking(models.Model):
     Status = [("pending", "Pending"), ("confirmed", "Confirmed"), ("cancelled", "Cancelled")]
     PaymentStatus = [("pending", "Pending"), ("paid", "Paid"), ("on_spot", "On Spot")]
     
+    name = models.CharField(max_length=100)
+    phone = models.CharField(max_length=15)
+    email = models.EmailField(blank=True, null=True)
+    note = models.TextField(blank=True, null=True)
+    
     time_slot = models.ForeignKey(TimeSlot, on_delete=models.CASCADE)
     booking_id = models.CharField(max_length=100, unique=True,primary_key=True,editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
