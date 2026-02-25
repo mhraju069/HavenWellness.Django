@@ -55,13 +55,13 @@ class Booking(models.Model):
     Status = [("pending", "Pending"), ("confirmed", "Confirmed"), ("cancelled", "Cancelled")]
     PaymentStatus = [("pending", "Pending"), ("paid", "Paid"), ("on_spot", "On Spot")]
     
-    name = models.CharField(max_length=100)
-    phone = models.CharField(max_length=15)
+    name = models.CharField(max_length=100,blank=True, null=True)
+    phone = models.CharField(max_length=15,blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
     note = models.TextField(blank=True, null=True)
     
     time_slot = models.ForeignKey(TimeSlot, on_delete=models.CASCADE)
-    booking_id = models.CharField(max_length=100, unique=True,primary_key=True,editable=False)
+    booking_id = models.CharField(max_length=100,editable=False,db_index=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
     guests_count = models.IntegerField(default=1)
@@ -75,22 +75,24 @@ class Booking(models.Model):
         return f"{self.service.title} | {self.time_slot.date} | {self.time_slot.time} | {self.status} "
 
     def save(self, *args, **kwargs):
+
+        if not self.name:
+            self.name = self.user.name or None
+        if not self.email:
+            self.email = self.user.email or None
+        
+        if not self.id:
+            super().save(*args, **kwargs)
+
         if not self.booking_id:
             self.booking_id = f"BK-{self.id:03d}"
-        
-        if not self.name:
-            self.name = self.user.username
-        if not self.email:
-            self.email = self.user.email
-        if not self.phone:
-            self.phone = self.user.phone
-
-        super().save(*args, **kwargs)
+            super().save(update_fields=['booking_id'])
+          
 
 
 class AccessCode(models.Model):
     booking = models.OneToOneField(Booking, on_delete=models.CASCADE)
-    code = models.CharField(max_length=100, editable=False,unique=True,primary_key=True)
+    code = models.CharField(max_length=100, editable=False,unique=True,db_index=True)
     valid_from = models.DateTimeField(default=timezone.now)
     valid_until = models.DateTimeField()
     is_used = models.BooleanField(default=False)
@@ -105,3 +107,5 @@ class AccessCode(models.Model):
             self.code = f"{random.choices(string.ascii_uppercase, k=3)}-{random.randint(1000, 9999)}"
         self.valid_until = self.valid_from + timedelta(minutes=self.booking.service.duration)
         super().save(*args, **kwargs)
+
+
