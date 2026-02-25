@@ -15,13 +15,11 @@ class BookingSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        print("validated_data 😊😊😊",validated_data)
-        # validated_data['service'] = Service.objects.get(title=validated_data['service'])
         booking = Booking.objects.create(**validated_data)
         slot = validated_data['time_slot']
         slot.booked_capacity += validated_data['guests_count']
         slot.save()
-        
+
         return booking
 
 
