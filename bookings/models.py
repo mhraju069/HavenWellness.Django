@@ -55,8 +55,8 @@ class TimeSlot(models.Model):
 
 
 class Booking(models.Model):
-    Status = [("pending", "Pending"), ("confirmed", "Confirmed"), ("cancelled", "Cancelled")]
-    PaymentStatus = [("pending", "Pending"), ("paid", "Paid"), ("on_spot", "On Spot")]
+    Status = [("confirmed", "Confirmed"), ("cancelled", "Cancelled")]
+    PaymentStatus = [("pending", "Pending"), ("paid", "Paid"), ("on_site", "On Site")]
     
     name = models.CharField(max_length=100,blank=True, null=True)
     phone = models.CharField(max_length=15,blank=True, null=True)
