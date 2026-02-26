@@ -3,10 +3,11 @@ from rest_framework.views import APIView
 from bookings.models import *
 from bookings.serializers import *
 from services.serializers import *
+from .serializers import *
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
-from services.models import Service
+from services.models import *
 from rest_framework import generics
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter
@@ -107,7 +108,7 @@ class PaymentListView(APIView):
         
 
 
-class AccessCodeListView(generics.ListAPIView):
+class AccessCodeListView(generics.ListAPIView): 
     permission_classes = [AllowAny]
     serializer_class = AccessCodeSerializer
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -117,4 +118,11 @@ class AccessCodeListView(generics.ListAPIView):
     
     def get_queryset(self):
         return AccessCode.objects.filter(is_active=True)
+    
+
+class ExceptionServiceListCreateView(generics.ListCreateAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = ExceptionServiceSerializer
+    
+    queryset = ExceptionService.objects.all()
     

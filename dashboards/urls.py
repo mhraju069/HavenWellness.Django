@@ -8,4 +8,5 @@ urlpatterns = [
     path('services/', ServiceApiView.as_view(), name='services'),
     path('payments/', PaymentListView.as_view(), name='payment-list'),
     path('access-codes/', AccessCodeListView.as_view(), name='access-code-list'),
+    path('exception-services/', ExceptionServiceListCreateView.as_view(), name='exception-service-list'),
 ]   
