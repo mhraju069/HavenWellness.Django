@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from bookings.models import *
 from bookings.serializers import *
 from services.serializers import *
+from payments.serializers import *
 from .serializers import *
 from django.utils import timezone
 from rest_framework.response import Response
@@ -104,8 +105,11 @@ class ServiceApiView(APIView):
 
 
 class PaymentListView(APIView):
-    pass
-        
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        payments = Payments.objects.filter(payment_status='paid')
+        return Response(PaymentSerializer(payments, many=True).data)
 
 
 class AccessCodeListView(generics.ListAPIView): 

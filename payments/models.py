@@ -7,7 +7,7 @@ from django.conf import settings
 class Payments(models.Model):
     STATUS = (
         ('pending','Pending'),
-        ('completed','Completed'),
+        ('paid','Paid'),
         ('failed','Failed'),
     )
     booking = models.ForeignKey(Booking,on_delete=models.SET_NULL,blank=True,null=True)
