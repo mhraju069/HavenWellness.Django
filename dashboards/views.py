@@ -100,3 +100,21 @@ class ServiceApiView(APIView):
             "average_duration": average_duration,
             "services": ServiceSerializer(services, many=True).data 
         })
+
+
+class PaymentListView(APIView):
+    pass
+        
+
+
+class AccessCodeListView(generics.ListAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = AccessCodeSerializer
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ['booking__service', 'is_used', 'is_active']
+    ordering_fields = ['valid_from', 'valid_until']
+    ordering = ['-valid_from']
+    
+    def get_queryset(self):
+        return AccessCode.objects.filter(is_active=True)
+    
