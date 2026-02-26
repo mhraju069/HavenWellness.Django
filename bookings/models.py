@@ -8,6 +8,15 @@ User = settings.AUTH_USER_MODEL
 
 # Create your models here.
 
+class BookingSettings(models.Model):
+    cancel_before = models.DurationField(default=timedelta(hours=24))
+    advance_before = models.DurationField(default=timedelta(days=30))
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return "Booking Settings"
+
 
 class Slot(models.Model):
     service = models.OneToOneField(Service, on_delete=models.CASCADE)
@@ -91,7 +100,6 @@ class Booking(models.Model):
             self.booking_id = f"BK-{self.id:03d}"
             super().save(update_fields=['booking_id'])
           
-
 
 class AccessCode(models.Model):
     booking = models.OneToOneField(Booking, on_delete=models.CASCADE,related_name="access_code")
