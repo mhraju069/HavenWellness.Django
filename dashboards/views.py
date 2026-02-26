@@ -3,11 +3,15 @@ from rest_framework.views import APIView
 from bookings.models import Booking, AccessCode
 from bookings.serializers import BookingSerializer
 from django.utils import timezone
-from rest_framework.permissions import IsAdminUser, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from services.models import Service
+from rest_framework import generics
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import OrderingFilter
+from rest_framework.permissions import IsAdminUser, AllowAny
 # Create your views here.
+
 
 class DashboardView(APIView):
     permission_classes = [AllowAny]
@@ -34,3 +38,15 @@ class DashboardView(APIView):
             "today_bookings_list": BookingSerializer(today_bookings_qs, many=True).data,
             "service_bookings_count": res
         })
+
+
+class ReservationListView(generics.ListAPIView):
+    permission_classes = [AllowAny]
+    queryset = Booking.objects.all()
+    serializer_class = BookingSerializer
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ['service', 'status', 'payment_status', 'time_slot__date']
+    ordering_fields = ['created_at', 'time_slot__date', 'total_amount']
+    ordering = ['-created_at']
+
+

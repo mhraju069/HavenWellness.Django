@@ -3,4 +3,5 @@ from .views import *
 
 urlpatterns = [
     path('', DashboardView.as_view(), name='dashboard'),
+    path('reservations/', ReservationListView.as_view(), name='reservation-list'),
 ]
