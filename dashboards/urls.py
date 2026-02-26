@@ -9,4 +9,5 @@ urlpatterns = [
     path('payments/', PaymentListView.as_view(), name='payment-list'),
     path('access-codes/', AccessCodeListView.as_view(), name='access-code-list'),
     path('exception-services/', ExceptionServiceListCreateView.as_view(), name='exception-service-list'),
+    path('exception-services/<int:pk>/', ExceptionServiceUpdateDestroyView.as_view(), name='exception-service-detail'),
 ]   

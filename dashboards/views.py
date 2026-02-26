@@ -126,3 +126,9 @@ class ExceptionServiceListCreateView(generics.ListCreateAPIView):
     
     queryset = ExceptionService.objects.all()
     
+
+class ExceptionServiceUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = ExceptionServiceSerializer
+    
+    queryset = ExceptionService.objects.all()
