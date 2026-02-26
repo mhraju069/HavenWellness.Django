@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'bookings',
     'others',
     'dashboards',
+    'payments'
 ]
 
 AUTH_USER_MODEL = "accounts.User"
