@@ -1,7 +1,8 @@
 from django.shortcuts import render
 from rest_framework.views import APIView
-from bookings.models import Booking, AccessCode
-from bookings.serializers import BookingSerializer
+from bookings.models import *
+from bookings.serializers import *
+from services.serializers import *
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
@@ -10,6 +11,7 @@ from rest_framework import generics
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAdminUser, AllowAny
+from django.db.models import Count, Sum
 # Create your views here.
 
 
@@ -50,3 +52,30 @@ class ReservationListView(generics.ListAPIView):
     ordering = ['-created_at']
 
 
+
+class CapacityListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        services = Service.objects.all()
+
+        slots = []
+        for service in services:
+            slot_obj = Slot.objects.filter(service=service).first()
+            if not slot_obj:
+                continue
+
+            total_booked = TimeSlot.objects.filter(
+                slot__service=service
+            ).aggregate(total=Sum('booked_capacity'))['total'] or 0
+            total_timeslots = TimeSlot.objects.filter(slot__service=service).count()
+            total_capacity = slot_obj.max_capacity * total_timeslots
+
+            slots.append({
+                "service": service.title,
+                "total_capacity": total_capacity,
+                "total_booked": total_booked,
+                "total_available": total_capacity - total_booked,
+            })
+
+        return Response({"services": ServiceSerializer(services, many=True).data,"capacity": slots})
