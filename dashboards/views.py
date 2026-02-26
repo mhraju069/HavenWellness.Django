@@ -11,7 +11,7 @@ from rest_framework import generics
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAdminUser, AllowAny
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Avg
 # Create your views here.
 
 
@@ -52,7 +52,6 @@ class ReservationListView(generics.ListAPIView):
     ordering = ['-created_at']
 
 
-
 class CapacityListView(APIView):
     permission_classes = [AllowAny]
 
@@ -79,3 +78,25 @@ class CapacityListView(APIView):
             })
 
         return Response({"services": ServiceSerializer(services, many=True).data,"capacity": slots})
+
+
+class ServiceApiView(APIView):
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        services = Service.objects.all()
+
+        total_services = services.count()
+        total_active_services = services.filter(is_active=True).count()
+        total_capacity = services.aggregate(total=Sum('capacity'))['total'] or 0
+        average_price = services.aggregate(total=Avg('price'))['total'] or 0
+        average_duration = services.aggregate(total=Avg('duration'))['total'] or 0
+        
+        return Response({
+            "total_services": total_services,
+            "total_active_services": total_active_services,
+            "total_capacity": total_capacity,
+            "average_price": average_price,
+            "average_duration": average_duration,
+            "services": ServiceSerializer(services, many=True).data 
+        })
