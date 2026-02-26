@@ -50,3 +50,14 @@ class ServiceFeature(models.Model):
 
     def __str__(self):
         return f"Feature for {self.service.title} | {self.feature}"
+
+
+class ExceptionService(models.Model):
+    service = models.ManyToManyField(Service, related_name='exception_services')
+    date = models.DateField()
+    description = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Exception for {self.service.title} | {self.date}"
