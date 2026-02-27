@@ -79,7 +79,7 @@ class Booking(models.Model):
     guests_count = models.IntegerField(default=1)
     status = models.CharField(max_length=20, choices=Status, default='pending')
     payment_status = models.CharField(max_length=20, choices=PaymentStatus, default='pending')
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

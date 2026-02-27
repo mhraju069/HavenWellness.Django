@@ -7,8 +7,8 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 def create_checkout_session(request, booking , payment , price, customer=None ):
 
-    if not booking or not price or not payment:
-        raise Exception("No booking or payments provided")
+    if booking is None or price is None or payment is None:
+        raise Exception("Required data for Checkout Session is missing")
     
     session_data = {
         "payment_method_types": ["card"],
@@ -33,6 +33,21 @@ def create_checkout_session(request, booking , payment , price, customer=None ):
         "metadata": {
             "booking": str(booking),
             "payment": str(payment)
+        },
+        "payment_intent_data": {
+            "metadata": {
+                "booking": str(booking),
+                "payment": str(payment)
+            }
+        },
+        "invoice_creation": {
+            "enabled": True,
+            "invoice_data": {
+                "metadata": {
+                    "booking": str(booking),
+                    "payment": str(payment)
+                }
+            }
         }
     }
     
@@ -43,9 +58,11 @@ def create_checkout_session(request, booking , payment , price, customer=None ):
 
     return session.url
 
+
 def create_payment_intent_data(request, booking , payment , price , customer_email , method="web"):
-    if not booking or not price or not payment:
-        raise Exception("No booking or payments provided")
+
+    if booking is None or price is None or payment is None:
+        raise Exception("Required payment data (booking, price, or payment ID) is missing")
     
     # Check if customer exists in Stripe or create new
     customers = stripe.Customer.list(email=customer_email).data
@@ -55,10 +72,7 @@ def create_payment_intent_data(request, booking , payment , price , customer_ema
         customer = stripe.Customer.create(email=customer_email)
     
     if method == "web":
-        return {
-            "url": create_checkout_session(request, booking, payment, price, customer=customer.id),
-            "publishableKey": settings.STRIPE_PUBLISHABLE_KEY
-        }
+        return create_checkout_session(request, booking, payment, price, customer=customer.id)
     
     # Create CustomerSession
     # components={"mobile_payment_element": {"enabled": True}} is for Mobile Payment Element
