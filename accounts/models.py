@@ -34,6 +34,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     LANGUAGE = (('en', 'English'),('de', 'German'),('nl', 'Dutch'))
 
     email = models.EmailField(max_length=255,unique=True,verbose_name="User Email")
+    uid = models.CharField(max_length=255,unique=True,blank=True, null=True,verbose_name="User UID")
     name = models.CharField(max_length=200, blank=True, null=True,verbose_name="User Name")
     bio = models.TextField(blank=True, null=True,verbose_name="User Bio")
     image = models.ImageField(upload_to='profile_images/', blank=True, null=True,)
