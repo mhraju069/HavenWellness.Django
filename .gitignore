@@ -53,3 +53,6 @@ coverage.xml
 Thumbs.db
 celerybeat-schedule
 gunicorn.ctl
+
+# Firebase
+firebase-key.json
