@@ -5,6 +5,8 @@ from datetime import timedelta
 from dotenv import load_dotenv
 load_dotenv()
 from corsheaders.defaults import default_headers
+import firebase_admin
+from firebase_admin import credentials
 
 DEBUG = True
 ALLOWED_HOSTS = ['*']
@@ -144,3 +146,7 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
 
+
+# Firebase Admin SDK
+cred = credentials.Certificate("firebase-key.json")
+firebase_admin.initialize_app(cred)
