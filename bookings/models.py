@@ -1,6 +1,6 @@
 from django.db import models
 from services.models import Service
-from datetime import timedelta
+from datetime import timedelta, time, datetime
 from django.utils import timezone
 import random,string,ast
 from django.conf import settings
@@ -9,6 +9,8 @@ User = settings.AUTH_USER_MODEL
 # Create your models here.
 
 class BookingSettings(models.Model):
+    open_time = models.TimeField(default=time(6, 0))
+    close_time = models.TimeField(default=time(18, 0))
     cancel_before = models.DurationField(default=timedelta(hours=24))
     advance_before = models.DurationField(default=timedelta(days=30))
     created_at = models.DateTimeField(auto_now_add=True)
@@ -44,9 +46,26 @@ class TimeSlot(models.Model):
         ('5.00 PM', '5.00 PM'),
         ('6.00 PM', '6.00 PM'),
     ]
+
+    @staticmethod
+    def generate_slots(open_time, close_time, duration_minutes):
+        slots = []
+        # Use a dummy date for calculation
+        dummy_date = datetime.now().date()
+        current_dt = datetime.combine(dummy_date, open_time)
+        end_dt = datetime.combine(dummy_date, close_time)
+
+        while current_dt + timedelta(minutes=duration_minutes) <= end_dt:
+            # Format time as '6.00 AM'
+            time_str = current_dt.strftime("%I.%M %p").lstrip('0')
+            # Save as tuple string to maintain compatibility with existing ast.literal_eval logic
+            slot_value = f"('{time_str}', '{time_str}')"
+            slots.append(slot_value)
+            current_dt += timedelta(minutes=duration_minutes)
+        return slots
     
     slot = models.ForeignKey(Slot, on_delete=models.CASCADE)
-    time = models.CharField(max_length=20, choices=TIMES)
+    time = models.CharField(max_length=100) # Increased max_length and removed static choices for dynamic slots
     date = models.DateField()
     booked_capacity = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -59,8 +78,13 @@ class TimeSlot(models.Model):
         return self.slot.max_capacity - self.booked_capacity
 
     def get_time_display(self):
-        time_tuple = ast.literal_eval(self.time)
-        return time_tuple[0]
+        try:
+            time_val = ast.literal_eval(self.time)
+            if isinstance(time_val, (list, tuple)):
+                return time_val[0]
+            return str(time_val)
+        except (ValueError, SyntaxError):
+            return self.time
 
 
 class Booking(models.Model):

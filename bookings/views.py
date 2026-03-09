@@ -6,9 +6,8 @@ from rest_framework import status
 from .serializers import *
 from .models import *
 from rest_framework.permissions import IsAuthenticated
-from services.models import Service
+from services.models import Service,ExcludeDate
 from core.permissions import IsAdmin
-from rest_framework import serializers
 # Create your views here.
 
 
@@ -22,14 +21,27 @@ class TimeSlotAPIView(generics.ListAPIView):
         service = self.request.query_params.get('service')
         slot = Slot.objects.filter(service__title=service).first()
 
+        if date in ExcludeDate.objects.filter(service__title=service).values_list('date', flat=True):
+            return Response({"status":False,"log":"No slots available on this date"}, status=status.HTTP_400_BAD_REQUEST)
+
         if not slot:
-            raise serializers.ValidationError({"status":False,"log":"Slot not found"})
+            return Response({"status":False,"log":"Slot not found"}, status=status.HTTP_400_BAD_REQUEST)
 
         if TimeSlot.objects.filter(date=date,slot=slot).exists():
             return TimeSlot.objects.filter(date=date,slot=slot)
 
-        for time in TimeSlot.TIMES:
-            TimeSlot.objects.create(date=date,time=time,slot=slot)
+        # Get booking settings to determine open/close times
+        settings = BookingSettings.objects.first()
+        if not settings:
+            # Fallback if no settings exist
+            for time_val in TimeSlot.TIMES:
+                TimeSlot.objects.create(date=date, time=time_val, slot=slot)
+        else:
+            # Generate dynamic slots based on service duration
+            duration = slot.service.duration
+            dynamic_times = TimeSlot.generate_slots(settings.open_time, settings.close_time, duration)
+            for time_val in dynamic_times:
+                TimeSlot.objects.create(date=date, time=time_val, slot=slot)
         
         return TimeSlot.objects.filter(date=date,slot=slot)
 

@@ -19,3 +19,22 @@ class ServiceAPIView(ListCreateAPIView):
     def get_queryset(self):
         return Service.objects.filter(is_active=True).order_by('-created_at')
     
+
+class ExcludeDateAPIView(ListCreateAPIView):
+    serializer_class = ExcludeDateSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['service']
+
+    def get_queryset(self):
+        return ExcludeDate.objects.all().order_by('-created_at')
+
+
+class ExcludeDateDestroyAPIView(RetrieveDestroyAPIView):
+    serializer_class = ExcludeDateSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['service']
+
+    def get_queryset(self):
+        return ExcludeDate.objects.all().order_by('-created_at')

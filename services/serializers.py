@@ -1,17 +1,20 @@
 from rest_framework import serializers
 from .models import Service, ServiceImage, ServiceFeature
 
+
 class ServiceImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceImage
         fields = '__all__'
         read_only_fields = ('created_at', 'updated_at')
 
+
 class ServiceFeatureSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceFeature
         fields = '__all__'
         read_only_fields = ('created_at', 'updated_at')
+
 
 class ServiceSerializer(serializers.ModelSerializer):
     images = ServiceImageSerializer(many=True, read_only=True)
@@ -26,3 +29,11 @@ class ServiceSerializer(serializers.ModelSerializer):
     
     def get_features(self, obj):
         return obj.features.all()
+
+
+class ExcludeDateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExcludeDate
+        fields = '__all__'
+        read_only_fields = ('created_at', 'updated_at')
+
