@@ -15,6 +15,7 @@ urlpatterns = [
     path('api/bookings/', include('bookings.urls')),
     path('api/dashboard/', include('dashboards.urls')),
     path('api/payments/', include('payments.urls')),
+    path('api/notify/', include('notifications.urls')),
     path('', RedirectView.as_view(url='/admin/', permanent=False)),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
