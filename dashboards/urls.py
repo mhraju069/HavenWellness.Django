@@ -8,6 +8,6 @@ urlpatterns = [
     path('services/', ServiceApiView.as_view(), name='services'),
     path('payments/', PaymentListView.as_view(), name='payment-list'),
     path('access-codes/', AccessCodeListView.as_view(), name='access-code-list'),
-    path('exception-services/', ExceptionServiceListCreateView.as_view(), name='exception-service-list'),
-    path('exception-services/<int:pk>/', ExceptionServiceUpdateDestroyView.as_view(), name='exception-service-detail'),
+    path('exclude-dates/', ExcludeDateListCreateView.as_view(), name='exclude-date-list'),
+    path('exclude-dates/<int:pk>/', ExcludeDateUpdateDestroyView.as_view(), name='exclude-date-detail'),
 ]   

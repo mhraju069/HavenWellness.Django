@@ -124,15 +124,15 @@ class AccessCodeListView(generics.ListAPIView):
         return AccessCode.objects.filter(is_active=True)
     
 
-class ExceptionServiceListCreateView(generics.ListCreateAPIView):
+class ExcludeDateListCreateView(generics.ListCreateAPIView):
     permission_classes = [AllowAny]
-    serializer_class = ExceptionServiceSerializer
+    serializer_class = ExcludeDateSerializer
     
-    queryset = ExceptionService.objects.all()
+    queryset = ExcludeDate.objects.all()
     
 
-class ExceptionServiceUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+class ExcludeDateUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [AllowAny]
-    serializer_class = ExceptionServiceSerializer
+    serializer_class = ExcludeDateSerializer
     
-    queryset = ExceptionService.objects.all()
+    queryset = ExcludeDate.objects.all()

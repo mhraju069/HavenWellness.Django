@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from services.models import *
 
-class ExceptionServiceSerializer(serializers.ModelSerializer):
+class ExcludeDateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ExceptionService
+        model = ExcludeDate
         fields = '__all__'
