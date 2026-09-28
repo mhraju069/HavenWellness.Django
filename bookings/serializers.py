@@ -1,18 +1,28 @@
 from rest_framework import serializers
-from .models import *
+from drf_spectacular.utils import extend_schema_field
+from .models import Booking, Slot, TimeSlot, AccessCode
+
+
+class AccessCodeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AccessCode
+        fields = '__all__'
+
 
 class BookingSerializer(serializers.ModelSerializer):
-    guests_count = serializers.IntegerField()
-    access_code = serializers.SerializerMethodField()
+    guests_count = serializers.IntegerField(default=1, help_text="Number of guests for the booking")
+    access_code = serializers.SerializerMethodField(help_text="Access code details if applicable for sauna services")
 
     class Meta:
         model = Booking
         fields = '__all__'
-        read_only_fields = ['user']
+        read_only_fields = ['user', 'booking_id']
 
     def validate(self, attrs):
-        if attrs['time_slot'].available_capacity() < attrs['guests_count']:
-            raise serializers.ValidationError(f"Not enough capacity.Available capacity {attrs['time_slot'].available_capacity()}")
+        time_slot = attrs.get('time_slot')
+        guests_count = attrs.get('guests_count', 1)
+        if time_slot and time_slot.available_capacity() < guests_count:
+            raise serializers.ValidationError({"guests_count": f"Not enough capacity. Available capacity is {time_slot.available_capacity()}"})
         return attrs
 
     def create(self, validated_data):
@@ -20,12 +30,12 @@ class BookingSerializer(serializers.ModelSerializer):
         slot = validated_data['time_slot']
         slot.booked_capacity += validated_data['guests_count']
         slot.save()
-
         return booking
 
-    def get_access_code(self,obj):
+    @extend_schema_field(AccessCodeSerializer)
+    def get_access_code(self, obj):
         service = obj.service
-        if service.title == "private_sauna" or service.title == "shared_sauna":
+        if service and service.title in ["private_sauna", "shared_sauna"]:
             data = AccessCode.objects.get_or_create(booking=obj)
             return AccessCodeSerializer(data[0]).data
         return None
@@ -38,18 +48,13 @@ class SlotSerializer(serializers.ModelSerializer):
 
 
 class TimeSlotSerializer(serializers.ModelSerializer):
-    available_capacity = serializers.SerializerMethodField()
-    time = serializers.CharField(source='get_time_display', read_only=True) 
-    
+    available_capacity = serializers.SerializerMethodField(help_text="Remaining available capacity for the slot")
+    time = serializers.CharField(source='get_time_display', read_only=True)
+
     class Meta:
         model = TimeSlot
         fields = '__all__'
 
+    @extend_schema_field(serializers.IntegerField())
     def get_available_capacity(self, obj):
         return obj.available_capacity()
-
-
-class AccessCodeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AccessCode
-        fields = '__all__'

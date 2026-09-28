@@ -1,0 +1,2356 @@
+openapi: 3.0.3
+info:
+  title: Haven Wellness API
+  version: 1.0.0
+  description: Comprehensive REST API documentation for Haven Wellness services, bookings,
+    user accounts, dashboards, payments, and notifications.
+paths:
+  /api/auth/:
+    post:
+      operationId: auth_create
+      summary: Authenticate or register user via Firebase ID Token
+      parameters:
+      - in: query
+        name: oauth
+        schema:
+          type: boolean
+          default: true
+        description: Whether login is via OAuth provider
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Firebase ID Token
+        required: true
+      tags:
+      - Accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FirebaseLoginRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FirebaseLoginRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FirebaseLoginRequestRequest'
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirebaseLoginResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetOtpResponse'
+          description: ''
+  /api/auth/get-otp/:
+    post:
+      operationId: auth_get_otp_create
+      summary: Request OTP email verification code
+      tags:
+      - Accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetOtpRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GetOtpRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GetOtpRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetOtpResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetOtpResponse'
+          description: ''
+  /api/auth/token/refresh/:
+    post:
+      operationId: auth_token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/auth/user/:
+    get:
+      operationId: auth_user_retrieve
+      summary: Retrieve, update or delete the authenticated user profile
+      tags:
+      - Accounts
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+    put:
+      operationId: auth_user_update
+      summary: Retrieve, update or delete the authenticated user profile
+      tags:
+      - Accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfileRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserProfileRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserProfileRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+    patch:
+      operationId: auth_user_partial_update
+      summary: Retrieve, update or delete the authenticated user profile
+      tags:
+      - Accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+    delete:
+      operationId: auth_user_destroy
+      summary: Retrieve, update or delete the authenticated user profile
+      tags:
+      - Accounts
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+  /api/auth/verify-otp/:
+    post:
+      operationId: auth_verify_otp_create
+      summary: Verify OTP code and receive JWT tokens
+      tags:
+      - Accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerifyRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OtpVerifyRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OtpVerifyRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpVerifyResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetOtpResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetOtpResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetOtpResponse'
+          description: ''
+  /api/bookings/:
+    get:
+      operationId: bookings_list
+      summary: List or create bookings for the authenticated user
+      parameters:
+      - name: cursor
+        required: false
+        in: query
+        description: The pagination cursor value.
+        schema:
+          type: string
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      tags:
+      - Bookings
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBookingList'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBookingList'
+          description: ''
+    post:
+      operationId: bookings_create
+      summary: List or create bookings for the authenticated user
+      parameters:
+      - name: cursor
+        required: false
+        in: query
+        description: The pagination cursor value.
+        schema:
+          type: string
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      tags:
+      - Bookings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBookingList'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+  /api/bookings/slots/:
+    get:
+      operationId: bookings_slots_list
+      summary: Get available time slots for a given date and service
+      parameters:
+      - name: cursor
+        required: false
+        in: query
+        description: The pagination cursor value.
+        schema:
+          type: string
+      - in: query
+        name: date
+        schema:
+          type: string
+          format: date
+        description: Booking date (YYYY-MM-DD)
+        required: true
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - in: query
+        name: service
+        schema:
+          type: string
+        description: Service title (e.g. private_sauna)
+        required: true
+      tags:
+      - Bookings
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTimeSlotList'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/dashboard/:
+    get:
+      operationId: dashboard_retrieve
+      summary: Get admin dashboard overview metrics and today's bookings
+      tags:
+      - Dashboard
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummaryResponse'
+          description: ''
+  /api/dashboard/access-codes/:
+    get:
+      operationId: dashboard_access_codes_list
+      summary: List active access codes for sauna services
+      parameters:
+      - in: query
+        name: booking__service
+        schema:
+          type: string
+          enum:
+          - activity
+          - arrangement
+          - lunchroom
+          - private_sauna
+          - shared_sauna
+        description: |-
+          * `private_sauna` - Private Sauna
+          * `shared_sauna` - Shared Sauna
+          * `arrangement` - Arrangement
+          * `activity` - Activity
+          * `lunchroom` - Lunchroom
+      - name: cursor
+        required: false
+        in: query
+        description: The pagination cursor value.
+        schema:
+          type: string
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+      - in: query
+        name: is_used
+        schema:
+          type: boolean
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      tags:
+      - Dashboard
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAccessCodeList'
+          description: ''
+  /api/dashboard/capacity/:
+    get:
+      operationId: dashboard_capacity_retrieve
+      summary: Get capacity status breakdown per service
+      tags:
+      - Dashboard
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapacityListResponse'
+          description: ''
+  /api/dashboard/exclude-dates/:
+    get:
+      operationId: dashboard_exclude_dates_list
+      summary: List or create excluded date entries for services
+      parameters:
+      - name: cursor
+        required: false
+        in: query
+        description: The pagination cursor value.
+        schema:
+          type: string
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      tags:
+      - Dashboard
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDashboardExcludeDateList'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDashboardExcludeDateList'
+          description: ''
+    post:
+      operationId: dashboard_exclude_dates_create
+      summary: List or create excluded date entries for services
+      parameters:
+      - name: cursor
+        required: false
+        in: query
+        description: The pagination cursor value.
+        schema:
+          type: string
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      tags:
+      - Dashboard
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DashboardExcludeDateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DashboardExcludeDateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DashboardExcludeDateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDashboardExcludeDateList'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardExcludeDate'
+          description: ''
+  /api/dashboard/exclude-dates/{id}/:
+    get:
+      operationId: dashboard_exclude_dates_retrieve
+      summary: Retrieve, update or delete an excluded date entry
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Dashboard
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardExcludeDate'
+          description: ''
+    put:
+      operationId: dashboard_exclude_dates_update
+      summary: Retrieve, update or delete an excluded date entry
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Dashboard
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DashboardExcludeDateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DashboardExcludeDateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DashboardExcludeDateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardExcludeDate'
+          description: ''
+    patch:
+      operationId: dashboard_exclude_dates_partial_update
+      summary: Retrieve, update or delete an excluded date entry
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Dashboard
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedDashboardExcludeDateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedDashboardExcludeDateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedDashboardExcludeDateRequest'
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardExcludeDate'
+          description: ''
+    delete:
+      operationId: dashboard_exclude_dates_destroy
+      summary: Retrieve, update or delete an excluded date entry
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Dashboard
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardExcludeDate'
+          description: ''
+  /api/dashboard/payments/:
+    get:
+      operationId: dashboard_payments_list
+      summary: List all completed/paid payment records
+      tags:
+      - Dashboard
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payment'
+          description: ''
+  /api/dashboard/reservations/:
+    get:
+      operationId: dashboard_reservations_list
+      summary: List all reservations with filtering and ordering
+      parameters:
+      - name: cursor
+        required: false
+        in: query
+        description: The pagination cursor value.
+        schema:
+          type: string
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - in: query
+        name: payment_status
+        schema:
+          type: string
+          enum:
+          - on_site
+          - paid
+          - pending
+        description: |-
+          * `pending` - Pending
+          * `paid` - Paid
+          * `on_site` - On Site
+      - in: query
+        name: service
+        schema:
+          type: string
+          enum:
+          - activity
+          - arrangement
+          - lunchroom
+          - private_sauna
+          - shared_sauna
+        description: |-
+          * `private_sauna` - Private Sauna
+          * `shared_sauna` - Shared Sauna
+          * `arrangement` - Arrangement
+          * `activity` - Activity
+          * `lunchroom` - Lunchroom
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - cancelled
+          - confirmed
+        description: |-
+          * `confirmed` - Confirmed
+          * `cancelled` - Cancelled
+      - in: query
+        name: time_slot__date
+        schema:
+          type: string
+          format: date
+      tags:
+      - Dashboard
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBookingList'
+          description: ''
+  /api/dashboard/services/:
+    get:
+      operationId: dashboard_services_retrieve
+      summary: Get service statistics and aggregated details
+      tags:
+      - Dashboard
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceStatsResponse'
+          description: ''
+  /api/notify/:
+    get:
+      operationId: notify_retrieve
+      summary: Get user notifications list
+      tags:
+      - Notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationListResponse'
+          description: ''
+  /api/notify/register-device/:
+    post:
+      operationId: notify_register_device_create
+      summary: Register device token for push notifications
+      parameters:
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: FCM Device token
+        required: true
+      tags:
+      - Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DeviceRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DeviceRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceRegisterResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/payments/cancel/:
+    get:
+      operationId: payments_cancel_retrieve
+      summary: Payment cancel callback page
+      tags:
+      - Payments
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMessageResponse'
+          description: ''
+  /api/payments/get-link/:
+    post:
+      operationId: payments_get_link_create
+      summary: Generate Stripe checkout payment link or payment intent for a booking
+      parameters:
+      - in: query
+        name: method
+        schema:
+          type: string
+          default: web
+        description: Payment flow method ('web' or 'app')
+      tags:
+      - Payments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetPaymentLinkRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GetPaymentLinkRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GetPaymentLinkRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPaymentLinkResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/payments/success/:
+    get:
+      operationId: payments_success_retrieve
+      summary: Payment success callback page
+      tags:
+      - Payments
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMessageResponse'
+          description: ''
+  /api/payments/webhook/:
+    post:
+      operationId: payments_webhook_create
+      summary: Stripe Webhook handler
+      tags:
+      - Payments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+  /api/services/:
+    get:
+      operationId: services_list
+      summary: List all active services or create a new service
+      parameters:
+      - name: cursor
+        required: false
+        in: query
+        description: The pagination cursor value.
+        schema:
+          type: string
+      - in: query
+        name: title
+        schema:
+          type: string
+          enum:
+          - activity
+          - arrangement
+          - lunchroom
+          - private_sauna
+          - shared_sauna
+        description: |-
+          * `private_sauna` - Private Sauna
+          * `shared_sauna` - Shared Sauna
+          * `arrangement` - Arrangement
+          * `activity` - Activity
+          * `lunchroom` - Lunchroom
+      tags:
+      - Services
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedServiceList'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedServiceList'
+          description: ''
+    post:
+      operationId: services_create
+      summary: List all active services or create a new service
+      parameters:
+      - name: cursor
+        required: false
+        in: query
+        description: The pagination cursor value.
+        schema:
+          type: string
+      - in: query
+        name: title
+        schema:
+          type: string
+          enum:
+          - activity
+          - arrangement
+          - lunchroom
+          - private_sauna
+          - shared_sauna
+        description: |-
+          * `private_sauna` - Private Sauna
+          * `shared_sauna` - Shared Sauna
+          * `arrangement` - Arrangement
+          * `activity` - Activity
+          * `lunchroom` - Lunchroom
+      tags:
+      - Services
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ServiceRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ServiceRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedServiceList'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+          description: ''
+  /api/services/exclude-date/:
+    get:
+      operationId: services_exclude_date_list
+      summary: List or create excluded dates for services
+      parameters:
+      - name: cursor
+        required: false
+        in: query
+        description: The pagination cursor value.
+        schema:
+          type: string
+      - in: query
+        name: service
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - activity
+            - arrangement
+            - lunchroom
+            - private_sauna
+            - shared_sauna
+        description: |-
+          * `private_sauna` - Private Sauna
+          * `shared_sauna` - Shared Sauna
+          * `arrangement` - Arrangement
+          * `activity` - Activity
+          * `lunchroom` - Lunchroom
+        explode: true
+        style: form
+      tags:
+      - Services
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExcludeDateList'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExcludeDateList'
+          description: ''
+    post:
+      operationId: services_exclude_date_create
+      summary: List or create excluded dates for services
+      parameters:
+      - name: cursor
+        required: false
+        in: query
+        description: The pagination cursor value.
+        schema:
+          type: string
+      - in: query
+        name: service
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - activity
+            - arrangement
+            - lunchroom
+            - private_sauna
+            - shared_sauna
+        description: |-
+          * `private_sauna` - Private Sauna
+          * `shared_sauna` - Shared Sauna
+          * `arrangement` - Arrangement
+          * `activity` - Activity
+          * `lunchroom` - Lunchroom
+        explode: true
+        style: form
+      tags:
+      - Services
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExcludeDateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExcludeDateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExcludeDateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExcludeDateList'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcludeDate'
+          description: ''
+  /api/services/exclude-date/{id}/:
+    get:
+      operationId: services_exclude_date_retrieve
+      summary: Retrieve or delete an excluded date for a service
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Services
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcludeDate'
+          description: ''
+    delete:
+      operationId: services_exclude_date_destroy
+      summary: Retrieve or delete an excluded date for a service
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Services
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcludeDate'
+          description: ''
+  /api/token/:
+    post:
+      operationId: token_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPairRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPairRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPairRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenObtainPair'
+          description: ''
+  /api/token/refresh/:
+    post:
+      operationId: token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+components:
+  schemas:
+    AccessCode:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+        valid_from:
+          type: string
+          format: date-time
+        valid_until:
+          type: string
+          format: date-time
+        is_used:
+          type: boolean
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        booking:
+          type: integer
+      required:
+      - booking
+      - code
+      - created_at
+      - id
+      - updated_at
+      - valid_until
+    Booking:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        guests_count:
+          type: integer
+          default: 1
+          description: Number of guests for the booking
+        access_code:
+          allOf:
+          - $ref: '#/components/schemas/AccessCode'
+          readOnly: true
+          description: Access code details if applicable for sauna services
+        name:
+          type: string
+          nullable: true
+          maxLength: 100
+        phone:
+          type: string
+          nullable: true
+          maxLength: 15
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        note:
+          type: string
+          nullable: true
+        booking_id:
+          type: string
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        payment_status:
+          $ref: '#/components/schemas/BookingPaymentStatusEnum'
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        time_slot:
+          type: integer
+        user:
+          type: integer
+          readOnly: true
+        service:
+          $ref: '#/components/schemas/ServiceEnum'
+      required:
+      - access_code
+      - booking_id
+      - created_at
+      - id
+      - service
+      - time_slot
+      - updated_at
+      - user
+    BookingPaymentStatusEnum:
+      enum:
+      - pending
+      - paid
+      - on_site
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `paid` - Paid
+        * `on_site` - On Site
+    BookingRequest:
+      type: object
+      properties:
+        guests_count:
+          type: integer
+          default: 1
+          description: Number of guests for the booking
+        name:
+          type: string
+          nullable: true
+          maxLength: 100
+        phone:
+          type: string
+          nullable: true
+          maxLength: 15
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        note:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        payment_status:
+          $ref: '#/components/schemas/BookingPaymentStatusEnum'
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        time_slot:
+          type: integer
+        service:
+          $ref: '#/components/schemas/ServiceEnum'
+      required:
+      - service
+      - time_slot
+    CapacityItem:
+      type: object
+      properties:
+        service:
+          type: string
+        total_capacity:
+          type: integer
+        total_booked:
+          type: integer
+        total_available:
+          type: integer
+      required:
+      - service
+      - total_available
+      - total_booked
+      - total_capacity
+    CapacityListResponse:
+      type: object
+      properties:
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/Service'
+        capacity:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapacityItem'
+      required:
+      - capacity
+      - services
+    DashboardExcludeDate:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        service:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceEnum'
+      required:
+      - created_at
+      - date
+      - description
+      - id
+      - service
+      - updated_at
+    DashboardExcludeDateRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+          minLength: 1
+        service:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceEnum'
+      required:
+      - date
+      - description
+      - service
+    DashboardSummaryResponse:
+      type: object
+      properties:
+        today_reservations:
+          type: integer
+        upcoming_reservations:
+          type: integer
+        active_codes:
+          type: integer
+        pending_payments:
+          type: integer
+        today_bookings_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Booking'
+        service_bookings_count:
+          type: object
+          additionalProperties:
+            type: integer
+      required:
+      - active_codes
+      - pending_payments
+      - service_bookings_count
+      - today_bookings_list
+      - today_reservations
+      - upcoming_reservations
+    DeviceRegisterResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+      - message
+    DeviceRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+      required:
+      - token
+    ExcludeDate:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        service:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceEnum'
+      required:
+      - created_at
+      - date
+      - description
+      - id
+      - service
+      - updated_at
+    ExcludeDateRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+          minLength: 1
+        service:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceEnum'
+      required:
+      - date
+      - description
+      - service
+    FirebaseLoginRequestRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: User name when oauth is false
+    FirebaseLoginResponse:
+      type: object
+      properties:
+        access:
+          type: string
+          description: JWT Access Token
+        refresh:
+          type: string
+          description: JWT Refresh Token
+        user:
+          $ref: '#/components/schemas/UserProfile'
+        status:
+          type: boolean
+        active:
+          type: boolean
+        log:
+          type: string
+      required:
+      - access
+      - active
+      - log
+      - refresh
+      - status
+      - user
+    GetOtpRequestRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: User's email address to send OTP
+        task:
+          type: string
+          default: ''
+          description: Optional task label
+      required:
+      - email
+    GetOtpResponse:
+      type: object
+      properties:
+        status:
+          type: boolean
+        log:
+          type: string
+      required:
+      - log
+      - status
+    GetPaymentLinkRequestRequest:
+      type: object
+      properties:
+        booking_id:
+          type: integer
+          description: ID of the booking to generate payment link for
+      required:
+      - booking_id
+    GetPaymentLinkResponse:
+      type: object
+      properties:
+        status:
+          type: boolean
+        log:
+          description: Stripe Payment Intent / Checkout Session URL or data
+      required:
+      - log
+      - status
+    LanguageEnum:
+      enum:
+      - en
+      - de
+      - nl
+      type: string
+      description: |-
+        * `en` - English
+        * `de` - German
+        * `nl` - Dutch
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        body:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        user:
+          type: integer
+          readOnly: true
+      required:
+      - body
+      - created_at
+      - id
+      - title
+      - updated_at
+      - user
+    NotificationListResponse:
+      type: object
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+      required:
+      - notifications
+    OtpVerifyRequestRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: User's email address
+        otp_code:
+          type: string
+          minLength: 1
+          description: 6-digit OTP code
+          maxLength: 6
+      required:
+      - email
+      - otp_code
+    OtpVerifyResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserProfile'
+        refresh:
+          type: string
+          description: JWT Refresh Token
+        access:
+          type: string
+          description: JWT Access Token
+      required:
+      - access
+      - refresh
+      - user
+    PaginatedAccessCodeList:
+      type: object
+      required:
+      - results
+      properties:
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?cursor=cD00ODY%3D"
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccessCode'
+    PaginatedBookingList:
+      type: object
+      required:
+      - results
+      properties:
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?cursor=cD00ODY%3D"
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Booking'
+    PaginatedDashboardExcludeDateList:
+      type: object
+      required:
+      - results
+      properties:
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?cursor=cD00ODY%3D"
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardExcludeDate'
+    PaginatedExcludeDateList:
+      type: object
+      required:
+      - results
+      properties:
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?cursor=cD00ODY%3D"
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExcludeDate'
+    PaginatedServiceList:
+      type: object
+      required:
+      - results
+      properties:
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?cursor=cD00ODY%3D"
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Service'
+    PaginatedTimeSlotList:
+      type: object
+      required:
+      - results
+      properties:
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?cursor=cD00ODY%3D"
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimeSlot'
+    PatchedDashboardExcludeDateRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+          minLength: 1
+        service:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceEnum'
+    PatchedUserProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+          title: User Name
+          maxLength: 200
+        bio:
+          type: string
+          nullable: true
+          title: User Bio
+        image:
+          type: string
+          format: binary
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+          maxLength: 15
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+        old_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: Current password required when updating password
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: New password
+    Payment:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        client:
+          allOf:
+          - $ref: '#/components/schemas/PaymentClient'
+          readOnly: true
+        service:
+          allOf:
+          - $ref: '#/components/schemas/PaymentService'
+          readOnly: true
+        booking:
+          allOf:
+          - $ref: '#/components/schemas/PaymentBooking'
+          readOnly: true
+        amount:
+          type: number
+          format: double
+        payment_date:
+          type: string
+          format: date-time
+        payment_status:
+          $ref: '#/components/schemas/PaymentPaymentStatusEnum'
+        transaction_id:
+          type: string
+          maxLength: 20
+        invoice_url:
+          nullable: true
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
+      required:
+      - amount
+      - booking
+      - client
+      - id
+      - service
+      - transaction_id
+    PaymentBooking:
+      type: object
+      properties:
+        booking_id:
+          type: string
+        time_slot:
+          type: string
+        booking_capacity:
+          type: integer
+      required:
+      - booking_capacity
+      - booking_id
+      - time_slot
+    PaymentClient:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+      required:
+      - email
+      - name
+    PaymentMessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+      - message
+    PaymentPaymentStatusEnum:
+      enum:
+      - pending
+      - paid
+      - failed
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `paid` - Paid
+        * `failed` - Failed
+    PaymentService:
+      type: object
+      properties:
+        name:
+          type: string
+        duration:
+          type: integer
+      required:
+      - duration
+      - name
+    PaymentTypeEnum:
+      enum:
+      - full
+      - partial
+      - on_spot
+      type: string
+      description: |-
+        * `full` - Full Payment
+        * `partial` - Partial Payment
+        * `on_spot` - On Spot Payment
+    RoleEnum:
+      enum:
+      - user
+      - admin
+      type: string
+      description: |-
+        * `user` - User
+        * `admin` - Admin
+    Service:
+      type: object
+      properties:
+        title:
+          $ref: '#/components/schemas/TitleEnum'
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceImage'
+          readOnly: true
+        features:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceFeature'
+          readOnly: true
+        subtitle:
+          type: string
+          nullable: true
+          maxLength: 100
+        description:
+          type: string
+        capacity:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        duration:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        payment_type:
+          $ref: '#/components/schemas/PaymentTypeEnum'
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - description
+      - features
+      - images
+      - updated_at
+    ServiceEnum:
+      enum:
+      - private_sauna
+      - shared_sauna
+      - arrangement
+      - activity
+      - lunchroom
+      type: string
+      description: |-
+        * `private_sauna` - Private Sauna
+        * `shared_sauna` - Shared Sauna
+        * `arrangement` - Arrangement
+        * `activity` - Activity
+        * `lunchroom` - Lunchroom
+    ServiceFeature:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        feature:
+          type: string
+          maxLength: 100
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        service:
+          $ref: '#/components/schemas/ServiceEnum'
+      required:
+      - created_at
+      - feature
+      - id
+      - service
+      - updated_at
+    ServiceFeatureRequest:
+      type: object
+      properties:
+        feature:
+          type: string
+          minLength: 1
+          maxLength: 100
+        service:
+          $ref: '#/components/schemas/ServiceEnum'
+      required:
+      - feature
+      - service
+    ServiceImage:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          nullable: true
+          maxLength: 100
+        image:
+          type: string
+          format: uri
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        service:
+          $ref: '#/components/schemas/ServiceEnum'
+      required:
+      - created_at
+      - id
+      - service
+      - updated_at
+    ServiceImageRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          nullable: true
+          maxLength: 100
+        image:
+          type: string
+          format: binary
+          nullable: true
+        service:
+          $ref: '#/components/schemas/ServiceEnum'
+      required:
+      - service
+    ServiceRequest:
+      type: object
+      properties:
+        title:
+          $ref: '#/components/schemas/TitleEnum'
+        subtitle:
+          type: string
+          nullable: true
+          maxLength: 100
+        description:
+          type: string
+          minLength: 1
+        capacity:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        duration:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        payment_type:
+          $ref: '#/components/schemas/PaymentTypeEnum'
+        is_active:
+          type: boolean
+      required:
+      - description
+    ServiceStatsResponse:
+      type: object
+      properties:
+        total_services:
+          type: integer
+        total_active_services:
+          type: integer
+        total_capacity:
+          type: integer
+        average_price:
+          type: number
+          format: double
+        average_duration:
+          type: number
+          format: double
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/Service'
+      required:
+      - average_duration
+      - average_price
+      - services
+      - total_active_services
+      - total_capacity
+      - total_services
+    StatusEnum:
+      enum:
+      - confirmed
+      - cancelled
+      type: string
+      description: |-
+        * `confirmed` - Confirmed
+        * `cancelled` - Cancelled
+    TimeSlot:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        available_capacity:
+          type: integer
+          readOnly: true
+          description: Remaining available capacity for the slot
+        time:
+          type: string
+          readOnly: true
+        date:
+          type: string
+          format: date
+        booked_capacity:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        slot:
+          type: integer
+      required:
+      - available_capacity
+      - created_at
+      - date
+      - id
+      - slot
+      - time
+      - updated_at
+    TitleEnum:
+      enum:
+      - private_sauna
+      - shared_sauna
+      - arrangement
+      - activity
+      - lunchroom
+      type: string
+      description: |-
+        * `private_sauna` - Private Sauna
+        * `shared_sauna` - Shared Sauna
+        * `arrangement` - Arrangement
+        * `activity` - Activity
+        * `lunchroom` - Lunchroom
+    TokenObtainPair:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - refresh
+    TokenObtainPairRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          writeOnly: true
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - email
+      - password
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+      required:
+      - access
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - refresh
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+          title: User Email
+        uid:
+          type: string
+          readOnly: true
+          nullable: true
+          title: User UID
+        name:
+          type: string
+          nullable: true
+          title: User Name
+          maxLength: 200
+        bio:
+          type: string
+          nullable: true
+          title: User Bio
+        image:
+          type: string
+          format: uri
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+          maxLength: 15
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          readOnly: true
+          title: User Role
+      required:
+      - email
+      - id
+      - role
+      - uid
+    UserProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+          title: User Name
+          maxLength: 200
+        bio:
+          type: string
+          nullable: true
+          title: User Bio
+        image:
+          type: string
+          format: binary
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+          maxLength: 15
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+        old_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: Current password required when updating password
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: New password
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

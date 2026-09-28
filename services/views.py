@@ -1,15 +1,20 @@
-from .models import *
+from .models import Service, ExcludeDate
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import *
+from .serializers import ServiceSerializer, ExcludeDateSerializer
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateAPIView, RetrieveDestroyAPIView
+from rest_framework.generics import ListCreateAPIView, RetrieveDestroyAPIView
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
-# Create your views here.
 
+@extend_schema(
+    tags=['Services'],
+    summary="List all active services or create a new service",
+    responses={200: ServiceSerializer(many=True), 201: ServiceSerializer}
+)
 class ServiceAPIView(ListCreateAPIView):
     serializer_class = ServiceSerializer
     permission_classes = [IsAuthenticated]
@@ -18,8 +23,13 @@ class ServiceAPIView(ListCreateAPIView):
 
     def get_queryset(self):
         return Service.objects.filter(is_active=True).order_by('-created_at')
-    
 
+
+@extend_schema(
+    tags=['Services'],
+    summary="List or create excluded dates for services",
+    responses={200: ExcludeDateSerializer(many=True), 201: ExcludeDateSerializer}
+)
 class ExcludeDateAPIView(ListCreateAPIView):
     serializer_class = ExcludeDateSerializer
     permission_classes = [IsAuthenticated]
@@ -30,6 +40,11 @@ class ExcludeDateAPIView(ListCreateAPIView):
         return ExcludeDate.objects.all().order_by('-created_at')
 
 
+@extend_schema(
+    tags=['Services'],
+    summary="Retrieve or delete an excluded date for a service",
+    responses={200: ExcludeDateSerializer}
+)
 class ExcludeDateDestroyAPIView(RetrieveDestroyAPIView):
     serializer_class = ExcludeDateSerializer
     permission_classes = [IsAuthenticated]

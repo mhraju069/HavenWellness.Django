@@ -5,14 +5,18 @@ from datetime import timedelta
 from dotenv import load_dotenv
 load_dotenv()
 from corsheaders.defaults import default_headers
-import firebase_admin
-from firebase_admin import credentials
+try:
+    import firebase_admin
+    from firebase_admin import credentials
+except ImportError:
+    firebase_admin = None
+    credentials = None
 
 DEBUG = True
 ALLOWED_HOSTS = ['*']
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
-SECRET_KEY = os.getenv("SECRET_KEY")
+SECRET_KEY = os.getenv("SECRET_KEY", "83n^4v$htzuagc^ece+qzqkb9+jwp0o%(flpbu)_)izs84np0n")
 BASE_DIR = Path(__file__).resolve().parent.parent
 CORS_ALLOW_HEADERS = list(default_headers) + ['ngrok-skip-browser-warning',]
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760 * 400 # 400MB
@@ -35,6 +39,7 @@ INSTALLED_APPS = [
     'django_filters',
     'rest_framework',
     'rest_framework_simplejwt',
+    'drf_spectacular',
     'accounts',
     'services',
     'bookings',
@@ -123,14 +128,30 @@ MEDIA_ROOT = BASE_DIR / "media"
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        ),
-    "DEFAULT_FILTER_BACKENDS": [
-        "django_filters.rest_framework.DjangoFilterBackend",
+    ),
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.OrderingFilter',
-        ],
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.CursorPagination',
     'PAGE_SIZE': None,
-    }
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Haven Wellness API',
+    'DESCRIPTION': 'Comprehensive REST API documentation for Haven Wellness services, bookings, user accounts, dashboards, payments, and notifications.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': '/api/',
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayRequestDuration': True,
+        'filter': True,
+    },
+}
 
 
 SIMPLE_JWT = {
@@ -149,5 +170,10 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
 
 
 # Firebase Admin SDK
-cred = credentials.Certificate("firebase-key.json")
-firebase_admin.initialize_app(cred)
+try:
+    key_path = BASE_DIR / "firebase-key.json"
+    if credentials and key_path.exists() and key_path.stat().st_size > 0:
+        cred = credentials.Certificate(str(key_path))
+        firebase_admin.initialize_app(cred)
+except Exception as e:
+    print("Firebase Admin SDK initialization failed:", e)
