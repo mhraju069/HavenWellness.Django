@@ -47,14 +47,20 @@ class OtpVerifyResponseSerializer(serializers.Serializer):
     access = serializers.CharField(help_text="JWT Access Token")
 
 
-class FirebaseLoginRequestSerializer(serializers.Serializer):
-    name = serializers.CharField(required=False, allow_blank=True, help_text="User name when oauth is false")
+class RegisterSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True, help_text="User's email address")
+    password = serializers.CharField(write_only=True, required=True, min_length=6, help_text="User's password")
+    name = serializers.CharField(required=False, allow_blank=True, help_text="User's full name")
 
 
-class FirebaseLoginResponseSerializer(serializers.Serializer):
-    access = serializers.CharField(help_text="JWT Access Token")
-    refresh = serializers.CharField(help_text="JWT Refresh Token")
-    user = UserProfileSerializer()
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True, help_text="User's email address")
+    password = serializers.CharField(write_only=True, required=True, help_text="User's password")
+
+
+class AuthResponseSerializer(serializers.Serializer):
     status = serializers.BooleanField()
-    active = serializers.BooleanField()
     log = serializers.CharField()
+    access = serializers.CharField(required=False, help_text="JWT Access Token")
+    refresh = serializers.CharField(required=False, help_text="JWT Refresh Token")
+    user = UserProfileSerializer(required=False)

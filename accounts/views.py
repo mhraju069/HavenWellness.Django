@@ -12,7 +12,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from rest_framework import generics, status, permissions
 from rest_framework_simplejwt.tokens import RefreshToken
-from firebase_admin import auth as firebase_auth
+
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
 
@@ -103,87 +103,100 @@ class OtpVerifyView(APIView):
 
 @extend_schema(
     tags=['Accounts'],
-    summary="Authenticate or register user via Firebase ID Token",
-    parameters=[
-        OpenApiParameter("token", OpenApiTypes.STR, OpenApiParameter.QUERY, description="Firebase ID Token", required=True),
-        OpenApiParameter("oauth", OpenApiTypes.BOOL, OpenApiParameter.QUERY, description="Whether login is via OAuth provider", default=True),
-    ],
-    request=FirebaseLoginRequestSerializer,
+    summary="Register a new user",
+    request=RegisterSerializer,
     responses={
-        200: FirebaseLoginResponseSerializer,
-        400: GetOtpResponseSerializer,
+        201: AuthResponseSerializer,
+        400: AuthResponseSerializer,
     }
 )
-class FirebaseLoginView(APIView):
+class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
-    serializer_class = FirebaseLoginRequestSerializer
+    serializer_class = RegisterSerializer
 
     def post(self, request):
-        id_token = request.query_params.get('token')
-        oauth_str = request.query_params.get('oauth', 'true')
-        oauth = str(oauth_str).lower() in ['true', '1']
+        serializer = RegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        if not id_token:
-            return Response({'status': False, 'log': 'Token is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+        email = serializer.validated_data.get('email')
+        password = serializer.validated_data.get('password')
+        name = serializer.validated_data.get('name', '')
+
+        if User.objects.filter(email=email).exists():
+            return Response(
+                {"status": False, "log": "User with this email already exists."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = User.objects.create_user(
+            email=email,
+            password=password,
+            name=name,
+            is_active=False
+        )
+
+        send_otp(user.email)
+
+        return Response({
+            "status": True,
+            "log": "Registration successful. OTP sent to email for account activation.",
+            "user": UserProfileSerializer(user, context={'request': request}).data
+        }, status=status.HTTP_201_CREATED)
+
+
+@extend_schema(
+    tags=['Accounts'],
+    summary="Login user with email and password",
+    request=LoginSerializer,
+    responses={
+        200: AuthResponseSerializer,
+        400: AuthResponseSerializer,
+        403: AuthResponseSerializer,
+    }
+)
+class LoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+    serializer_class = LoginSerializer
+
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data.get('email')
+        password = serializer.validated_data.get('password')
+
         try:
-            decoded_token = firebase_auth.verify_id_token(id_token) if firebase_auth else {'uid': 'mock-uid', 'email': 'user@example.com'}
-        except Exception as e:
-            return Response({'status': False, 'log': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
-        uid = decoded_token.get('uid')
-        email = decoded_token.get('email')
-        
-        if not email:
-            return Response({'status': False, 'log': 'Email not provided by Firebase'}, status=status.HTTP_400_BAD_REQUEST)
-            
-        name = decoded_token.get('name')
-        profile_image_url = decoded_token.get('picture')
-
-        if oauth:
-            user, created = User.objects.get_or_create(
-                email=email,
-                defaults={
-                    "uid": uid,
-                    'name': name,
-                    'is_active': True,
-                    'password': make_password(None),
-                },
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response(
+                {"status": False, "log": "Invalid email or password."},
+                status=status.HTTP_400_BAD_REQUEST
             )
-            if created and profile_image_url:
-                try:
-                    img_response = requests.get(profile_image_url, timeout=5)
-                    if img_response.status_code == 200:
-                        file_name = f"{slugify(name or email.split('@')[0])}-profile.jpg"
-                        user.image.save(
-                            file_name,
-                            ContentFile(img_response.content),
-                            save=True,
-                        )
-                except Exception:
-                    pass
-        else:
-            user, created = User.objects.get_or_create(
-                email=email,
-                defaults={
-                    "uid": uid,
-                    'name': request.data.get('name') or "",
-                    'is_active': False,
-                    'password': make_password(uid),
-                }
-            )
-            if not user.is_active:
-                send_otp(user.email)
 
-        if user:
-            token = RefreshToken.for_user(user)
-            return Response({
-                'access': str(token.access_token),
-                'refresh': str(token),
-                'user': UserProfileSerializer(user, context={'request': request}).data,
-                'status': True,
-                'active': user.is_active,
-                'log': 'Login successful'
-            }, status=status.HTTP_200_OK)
-        else:
-            return Response({'status': False, 'log': 'Invalid or expired token'}, status=status.HTTP_400_BAD_REQUEST)
+        if not user.check_password(password):
+            return Response(
+                {"status": False, "log": "Invalid email or password."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if getattr(user, 'block', False):
+            return Response(
+                {"status": False, "log": "User account is suspended."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if not user.is_active:
+            send_otp(user.email)
+            return Response(
+                {"status": False, "log": "Account is inactive. OTP has been sent to your email for verification."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            "status": True,
+            "log": "Login successful.",
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "user": UserProfileSerializer(user, context={'request': request}).data,
+        }, status=status.HTTP_200_OK)
