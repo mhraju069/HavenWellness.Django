@@ -1,3 +1,4 @@
+from django.core.files import images
 from django.db import models
 
 # Create your models here.
@@ -5,6 +6,7 @@ class SaunaSeesion(models.Model):
     title = models.CharField(max_length=100)
     subtitle = models.CharField(max_length=100, default="")
     description = models.TextField()
+    images = models.ImageField(upload_to="sauna_seesion", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -44,7 +46,7 @@ class ServiceFeature(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Feature for {self.service.title} | {self.feature}"
+        return f"Feature for {self.feature}"
 
 
 class ExcludeDate(models.Model):
@@ -54,4 +56,4 @@ class ExcludeDate(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Exclude Date for {self.service.title} | {self.date}"
+        return f"Exclude Date for {self.date}"

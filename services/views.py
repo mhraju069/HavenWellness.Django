@@ -10,6 +10,28 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
 
+class AllServicesView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Services"],
+        summary="List all Services",
+        responses={200: AllServicesSerializer},
+    )
+    def get(self, request):
+        sauna_seesion = SaunaSeesion.objects.all()
+
+        serializer = AllServicesSerializer({
+            "sauna_seesion": sauna_seesion,
+        })
+
+        return Response({
+            "success": True,
+            "data": serializer.data,
+            "message": "All Service List",
+        })
+
+
 class SaunaServiceView(APIView):
     permission_classes = [AllowAny]
 
@@ -32,7 +54,7 @@ class SaunaServiceView(APIView):
             "data": serializer.data,
             "message": "Sauna Service List",
         })
-        
+
 
 # @extend_schema(
 #     tags=['Services'],
