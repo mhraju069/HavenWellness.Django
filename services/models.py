@@ -9,7 +9,7 @@ class SaunaSeesion(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.name
+        return self.title
 
 
 class PrivateSauna(models.Model):
@@ -22,14 +22,11 @@ class PrivateSauna(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.title} | {self.base_price}"
+        return f"{self.base_price_3hrs} | {self.base_price_4hrs}"
 
 
 
 class SharedSauna(models.Model):
-    title = models.CharField(max_length=100, unique=True)
-    description = models.TextField()
-    image = models.ImageField(upload_to='services/images/', blank=True, null=True)
     price_per_person = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_available = models.BooleanField(default=True)
     max_person = models.PositiveIntegerField(default=6)
@@ -37,7 +34,7 @@ class SharedSauna(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.title} | {self.price}"
+        return f"{self.price_per_person}"
 
 
 
