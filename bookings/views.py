@@ -2,10 +2,11 @@ from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework import generics, status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
+from django.db.models import Q
 
-from .serializers import TimeSlotSerializer, BookingSerializer
+from .serializers import TimeSlotSerializer, BookingSerializer, AvailableTimeSlotSerializer
 from .models import Slot, TimeSlot, BookingSettings, Booking
 from services.models import ExcludeDate
 from core.permissions import IsAdmin
@@ -94,3 +95,84 @@ class BookingAPIView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+@extend_schema(
+    tags=['Bookings'],
+    summary="Get detailed available and booked slots breakdown for a date and service",
+    parameters=[
+        OpenApiParameter("date", OpenApiTypes.DATE, OpenApiParameter.QUERY, description="Booking date (YYYY-MM-DD)", required=True),
+        OpenApiParameter("service_type", OpenApiTypes.STR, OpenApiParameter.QUERY, description="Service title or type (e.g. private_sauna, shared_sauna, sauna)", required=True),
+    ],
+    responses={
+        200: AvailableTimeSlotSerializer(many=True),
+        400: OpenApiTypes.OBJECT,
+        404: OpenApiTypes.OBJECT,
+    }
+)
+class GetAvailableSlotsAPIView(generics.ListAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = AvailableTimeSlotSerializer
+    
+    def get(self, request, *args, **kwargs):
+        date = request.query_params.get('date')
+        if not date:
+            return Response({"status": False, "log": "date query parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        service_type = request.query_params.get('service_type') or request.query_params.get('service')
+        if not service_type:
+            return Response({"status": False, "log": "service_type query parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Find matching slot by service title or service_type
+        slot_qs = Slot.objects.filter(
+            Q(service__title__iexact=service_type) | Q(service__service_type__iexact=service_type)
+        )
+        if str(service_type).isdigit():
+            slot_qs = Slot.objects.filter(Q(service__id=int(service_type)) | Q(service__title__iexact=service_type))
+            
+        slot = slot_qs.first()
+        if not slot:
+            return Response({"status": False, "log": f"Slot configuration not found for service: '{service_type}'"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Check if date is marked as excluded for this service
+        if ExcludeDate.objects.filter(service=slot.service, date=date).exists():
+            return Response({
+                "status": True,
+                "is_excluded": True,
+                "message": "Date is excluded for this service",
+                "service": slot.service.title,
+                "date": date,
+                "data": []
+            }, status=status.HTTP_200_OK)
+
+        # Auto-generate TimeSlots for date if not created yet
+        if not TimeSlot.objects.filter(date=date, slot=slot).exists():
+            settings = BookingSettings.objects.first()
+            if not settings:
+                for time_val in TimeSlot.TIMES:
+                    TimeSlot.objects.create(date=date, time=time_val, slot=slot)
+            else:
+                duration = getattr(slot.service, 'duration', 60)
+                dynamic_times = TimeSlot.generate_slots(settings.open_time, settings.close_time, duration)
+                for time_val in dynamic_times:
+                    TimeSlot.objects.create(date=date, time=time_val, slot=slot)
+
+        time_slots = TimeSlot.objects.filter(date=date, slot=slot).order_by('id')
+        serialized_data = AvailableTimeSlotSerializer(time_slots, many=True).data
+
+        available_count = sum(1 for slot_data in serialized_data if slot_data['is_available'])
+        booked_count = sum(1 for slot_data in serialized_data if slot_data['is_booked'])
+
+        return Response({
+            "status": True,
+            "service": slot.service.title,
+            "service_type": slot.service.service_type,
+            "date": date,
+            "max_capacity": slot.max_capacity,
+            "total_slots": len(serialized_data),
+            "available_slots_count": available_count,
+            "booked_slots_count": booked_count,
+            "data": serialized_data
+        }, status=status.HTTP_200_OK)
+
+    

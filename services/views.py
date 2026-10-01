@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .serializers import ServiceSerializer, ExcludeDateSerializer
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.generics import ListCreateAPIView, RetrieveDestroyAPIView
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
@@ -16,8 +16,8 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
     responses={200: ServiceSerializer(many=True), 201: ServiceSerializer}
 )
 class ServiceAPIView(ListCreateAPIView):
+    permission_classes = [AllowAny]
     serializer_class = ServiceSerializer
-    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['title']
 

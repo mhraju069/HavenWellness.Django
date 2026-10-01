@@ -58,3 +58,38 @@ class TimeSlotSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.IntegerField())
     def get_available_capacity(self, obj):
         return obj.available_capacity()
+
+
+class AvailableTimeSlotSerializer(serializers.ModelSerializer):
+    time = serializers.CharField(source='get_time_display', read_only=True)
+    max_capacity = serializers.IntegerField(source='slot.max_capacity', read_only=True)
+    booked_capacity = serializers.IntegerField(read_only=True)
+    available_capacity = serializers.SerializerMethodField(help_text="Remaining available capacity for the slot")
+    is_booked = serializers.SerializerMethodField(help_text="True if slot is fully booked")
+    is_available = serializers.SerializerMethodField(help_text="True if slot has available capacity")
+
+    class Meta:
+        model = TimeSlot
+        fields = [
+            'id',
+            'time',
+            'date',
+            'max_capacity',
+            'booked_capacity',
+            'available_capacity',
+            'is_booked',
+            'is_available',
+        ]
+
+    @extend_schema_field(serializers.IntegerField())
+    def get_available_capacity(self, obj):
+        return max(0, obj.slot.max_capacity - obj.booked_capacity)
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_is_booked(self, obj):
+        return obj.booked_capacity >= obj.slot.max_capacity
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_is_available(self, obj):
+        return (obj.slot.max_capacity - obj.booked_capacity) > 0
+
