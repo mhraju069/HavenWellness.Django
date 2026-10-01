@@ -20,9 +20,11 @@ class AllServicesView(APIView):
     )
     def get(self, request):
         sauna_seesion = SaunaSeesion.objects.all()
+        activity_session = Activities.objects.all()
 
         serializer = AllServicesSerializer({
             "sauna_seesion": sauna_seesion,
+            "activity_session": activity_session,
         })
 
         return Response({

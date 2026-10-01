@@ -27,7 +27,6 @@ class PrivateSauna(models.Model):
         return f"{self.base_price_3hrs} | {self.base_price_4hrs}"
 
 
-
 class SharedSauna(models.Model):
     price_per_person = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_available = models.BooleanField(default=True)
@@ -38,6 +37,37 @@ class SharedSauna(models.Model):
     def __str__(self):
         return f"{self.price_per_person}"
 
+
+class Activities(models.Model):
+    title = models.CharField(max_length=100)
+    subtitle = models.CharField(max_length=100, default="")
+    description = models.TextField()
+    images = models.ImageField(upload_to="activity", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.title
+
+
+class ActivitySession(models.Model):
+    title = models.CharField(max_length=100)
+    description = models.TextField()
+    images = models.ImageField(upload_to="activity_session", null=True, blank=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.title}"
+
+
+class ActivitiesFeature(models.Model):
+    activity = models.ForeignKey(ActivitySession, on_delete=models.CASCADE)
+    feature = models.CharField(max_length=100)
+
+    def __str__(self):
+        return f"{self.feature}"
 
 
 class ServiceFeature(models.Model):

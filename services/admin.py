@@ -6,3 +6,8 @@ from unfold.admin import ModelAdmin
 admin.site.register(SaunaSeesion, ModelAdmin)
 admin.site.register(PrivateSauna, ModelAdmin)
 admin.site.register(SharedSauna, ModelAdmin)
+
+
+admin.site.register(Activities, ModelAdmin)
+admin.site.register(ActivitySession, ModelAdmin)
+admin.site.register(ActivitiesFeature, ModelAdmin)
