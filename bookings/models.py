@@ -1,5 +1,4 @@
 from django.db import models
-from services.models import Service
 from datetime import timedelta, time, datetime
 from django.utils import timezone
 import random,string,ast
@@ -21,7 +20,6 @@ class BookingSettings(models.Model):
 
 
 class Slot(models.Model):
-    service = models.OneToOneField(Service, on_delete=models.CASCADE)
     max_capacity = models.IntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -99,7 +97,6 @@ class Booking(models.Model):
     time_slot = models.ForeignKey(TimeSlot, on_delete=models.CASCADE)
     booking_id = models.CharField(max_length=100,editable=False,db_index=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    service = models.ForeignKey(Service, on_delete=models.CASCADE)
     guests_count = models.IntegerField(default=1)
     status = models.CharField(max_length=20, choices=Status, default='pending')
     payment_status = models.CharField(max_length=20, choices=PaymentStatus, default='pending')

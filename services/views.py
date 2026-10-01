@@ -1,28 +1,13 @@
-from .models import Service, ExcludeDate
+from .models import ExcludeDate
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import ServiceSerializer, ExcludeDateSerializer
+from .serializers import  ExcludeDateSerializer
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.generics import ListCreateAPIView, RetrieveDestroyAPIView
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
-
-
-@extend_schema(
-    tags=['Services'],
-    summary="List all active services or create a new service",
-    responses={200: ServiceSerializer(many=True), 201: ServiceSerializer}
-)
-class ServiceAPIView(ListCreateAPIView):
-    permission_classes = [AllowAny]
-    serializer_class = ServiceSerializer
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['title']
-
-    def get_queryset(self):
-        return Service.objects.filter(is_active=True).order_by('-created_at')
 
 
 @extend_schema(

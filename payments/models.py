@@ -11,7 +11,6 @@ class Payments(models.Model):
         ('failed','Failed'),
     )
     booking = models.ForeignKey(Booking,on_delete=models.SET_NULL,blank=True,null=True)
-    service = models.ForeignKey(Service,on_delete=models.SET_NULL,blank=True,null=True)
     client = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,blank=True,null=True)
     amount = models.FloatField()
     payment_date = models.DateTimeField(default=timezone.now)

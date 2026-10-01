@@ -8,15 +8,6 @@ class ServiceFeatureSerializer(serializers.ModelSerializer):
         model = ServiceFeature
         fields = ['feature']
 
-class ServiceSerializer(serializers.ModelSerializer):
-    features = ServiceFeatureSerializer(many=True, read_only=True)
-    class Meta:
-        model = Service
-        fields = '__all__'
-
-    def get_features(self, obj):
-        return obj.features.all()
-
 
 class ExcludeDateSerializer(serializers.ModelSerializer):
     class Meta:
