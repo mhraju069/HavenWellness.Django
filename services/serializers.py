@@ -8,16 +8,36 @@ class SaunaSessionSerializer(serializers.ModelSerializer):
         model = SaunaSeesion
         exclude = ['created_at', 'updated_at']
 
-class ActivitySessionSerializer(serializers.ModelSerializer):
+class ActivitiesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Activities
         exclude = ['created_at', 'updated_at']
 
 
+class ActivitiesFeatureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ActivitiesFeature
+        fields = ['id', 'feature']
+
+
+class ActivitySessionSerializer(serializers.ModelSerializer):
+    features = ActivitiesFeatureSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ActivitySession
+        exclude = ['created_at', 'updated_at']
+
+
 class AllServicesSerializer(serializers.Serializer):
     sauna_seesion = SaunaSessionSerializer(many=True, required=False)
-    activity_session = ActivitySessionSerializer(many=True, required=False)
+    activity_session = ActivitiesSerializer(many=True, required=False)
 
+
+
+class ServiceFeatureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ServiceFeature
+        exclude = ['created_at', 'updated_at']
 
 
 class PrivateSaunaSerializer(serializers.ModelSerializer):

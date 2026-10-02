@@ -63,7 +63,7 @@ class ActivitySession(models.Model):
 
 
 class ActivitiesFeature(models.Model):
-    activity = models.ForeignKey(ActivitySession, on_delete=models.CASCADE)
+    activity = models.ForeignKey(ActivitySession, on_delete=models.CASCADE, related_name='features')
     feature = models.CharField(max_length=100)
 
     def __str__(self):

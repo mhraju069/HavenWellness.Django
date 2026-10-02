@@ -58,6 +58,23 @@ class SaunaServiceView(APIView):
         })
 
 
+class ActivitiesView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Services"],
+        summary="List Activity Sessions",
+        responses={200: ActivitySessionSerializer(many=True)},
+    )
+    def get(self, request):
+        activity_sessions = ActivitySession.objects.prefetch_related('features').all()
+        serializer = ActivitySessionSerializer(activity_sessions, many=True, context={'request': request})
+        return Response({
+            "success": True,
+            "data": serializer.data,
+            "message": "Activity Session List",
+        })
+
 # @extend_schema(
 #     tags=['Services'],
 #     summary="List or create excluded dates for services",
