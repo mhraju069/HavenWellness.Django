@@ -6,8 +6,11 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 from django.db.models import Q
 
-from .serializers import TimeSlotSerializer, BookingSerializer, AvailableTimeSlotSerializer
-from .models import Slot, TimeSlot, BookingSettings, Booking
+from .serializers import (
+    TimeSlotSerializer, BookingSerializer, AvailableTimeSlotSerializer,
+    UserMembershipSerializer, UserSessionPassSerializer
+)
+from .models import Slot, TimeSlot, BookingSettings, Booking, UserMembership, UserSessionPass
 from services.models import ExcludeDate
 from core.permissions import IsAdmin
 
@@ -53,7 +56,7 @@ class TimeSlotAPIView(generics.ListAPIView):
             for time_val in TimeSlot.TIMES:
                 TimeSlot.objects.create(date=date, time=time_val, slot=slot)
         else:
-            duration = slot.service.duration
+            duration = getattr(slot.service, 'duration_minutes', 60)
             dynamic_times = TimeSlot.generate_slots(settings.open_time, settings.close_time, duration)
             for time_val in dynamic_times:
                 TimeSlot.objects.create(date=date, time=time_val, slot=slot)
@@ -123,36 +126,33 @@ class GetAvailableSlotsAPIView(generics.ListAPIView):
         if not service_type:
             return Response({"status": False, "log": "service_type query parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Find matching slot by service title or service_type
         slot_qs = Slot.objects.filter(
-            Q(service__title__iexact=service_type) | Q(service__service_type__iexact=service_type)
+            Q(service__name__iexact=service_type) | Q(service__service_type__iexact=service_type)
         )
         if str(service_type).isdigit():
-            slot_qs = Slot.objects.filter(Q(service__id=int(service_type)) | Q(service__title__iexact=service_type))
+            slot_qs = Slot.objects.filter(Q(service__id=int(service_type)) | Q(service__name__iexact=service_type))
             
         slot = slot_qs.first()
         if not slot:
             return Response({"status": False, "log": f"Slot configuration not found for service: '{service_type}'"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Check if date is marked as excluded for this service
         if ExcludeDate.objects.filter(service=slot.service, date=date).exists():
             return Response({
                 "status": True,
                 "is_excluded": True,
                 "message": "Date is excluded for this service",
-                "service": slot.service.title,
+                "service": slot.service.name if slot.service else service_type,
                 "date": date,
                 "data": []
             }, status=status.HTTP_200_OK)
 
-        # Auto-generate TimeSlots for date if not created yet
         if not TimeSlot.objects.filter(date=date, slot=slot).exists():
             settings = BookingSettings.objects.first()
             if not settings:
                 for time_val in TimeSlot.TIMES:
                     TimeSlot.objects.create(date=date, time=time_val, slot=slot)
             else:
-                duration = getattr(slot.service, 'duration', 60)
+                duration = getattr(slot.service, 'duration_minutes', 60)
                 dynamic_times = TimeSlot.generate_slots(settings.open_time, settings.close_time, duration)
                 for time_val in dynamic_times:
                     TimeSlot.objects.create(date=date, time=time_val, slot=slot)
@@ -165,8 +165,8 @@ class GetAvailableSlotsAPIView(generics.ListAPIView):
 
         return Response({
             "status": True,
-            "service": slot.service.title,
-            "service_type": slot.service.service_type,
+            "service": slot.service.name if slot.service else service_type,
+            "service_type": slot.service.service_type if slot.service else service_type,
             "date": date,
             "max_capacity": slot.max_capacity,
             "total_slots": len(serialized_data),
@@ -175,4 +175,38 @@ class GetAvailableSlotsAPIView(generics.ListAPIView):
             "data": serialized_data
         }, status=status.HTTP_200_OK)
 
-    
+
+@extend_schema(
+    tags=['Bookings'],
+    summary="User Memberships endpoint",
+    responses={200: UserMembershipSerializer(many=True)}
+)
+class UserMembershipAPIView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserMembershipSerializer
+
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False) or self.request.user.is_anonymous:
+            return UserMembership.objects.none()
+        return UserMembership.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+@extend_schema(
+    tags=['Bookings'],
+    summary="User Session Passes endpoint",
+    responses={200: UserSessionPassSerializer(many=True)}
+)
+class UserSessionPassAPIView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserSessionPassSerializer
+
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False) or self.request.user.is_anonymous:
+            return UserSessionPass.objects.none()
+        return UserSessionPass.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
