@@ -1,6 +1,7 @@
 from services.models import Activities
 from rest_framework import serializers
 from .models import *
+from payments.serializers import SessionPassSerializer, SubscriptionPlansSerializer 
 
 
 class SaunaSessionSerializer(serializers.ModelSerializer):
@@ -34,10 +35,18 @@ class LunchroomSerializer(serializers.ModelSerializer):
         exclude = ['created_at', 'updated_at']
 
 
+class SaltroomSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Saltroom
+        exclude = ['created_at', 'updated_at']
+
+
 class AllServicesSerializer(serializers.Serializer):
     sauna_seesion = SaunaSessionSerializer(many=True, required=False)
     activity_session = ActivitiesSerializer(many=True, required=False)
     lunchroom = LunchroomSerializer(many=True, required=False)
+    saltroom = SaltroomSerializer(many=True, required=False)
+
 
 
 
@@ -70,3 +79,11 @@ class SharedSaunaSerializer(serializers.ModelSerializer):
 class SaunaServiceSerializer(serializers.Serializer):
     private_sauna = PrivateSaunaSerializer(many=True, required=False)
     shared_sauna = SharedSaunaSerializer(many=True, required=False)
+
+
+#Salt room
+
+class SaltroomServiceSerializer(serializers.Serializer):
+    saltroom = SaltroomSerializer(many=True, required=False)
+    subscription_plans = SubscriptionPlansSerializer(many=True, required=False)
+    session_pass = SessionPassSerializer(many=True, required=False)

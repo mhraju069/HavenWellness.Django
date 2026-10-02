@@ -1,4 +1,5 @@
 from .models import *
+from payments.models import SubscriptionPlans, SessionPass
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -22,11 +23,13 @@ class AllServicesView(APIView):
         sauna_seesion = SaunaSeesion.objects.all()
         activity_session = Activities.objects.all()
         lunchroom = Lunchroom.objects.all()
+        saltroom = Saltroom.objects.all()
 
         serializer = AllServicesSerializer({
             "sauna_seesion": sauna_seesion,
             "activity_session": activity_session,
             "lunchroom": lunchroom,
+            "saltroom": saltroom,
         }, context={'request': request})
 
         return Response({
@@ -75,6 +78,32 @@ class ActivitiesView(APIView):
             "success": True,
             "data": serializer.data,
             "message": "Activity Session List",
+        })
+
+
+class SaltroomServiceView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Services"],
+        summary="List Saltroom Services",
+        responses={200: SaltroomServiceSerializer},
+    )
+    def get(self, request):
+        saltroom = Saltroom.objects.all()
+        subscription_plans = SubscriptionPlans.objects.prefetch_related('features').all()
+        session_pass = SessionPass.objects.prefetch_related('features').all()
+
+        serializer = SaltroomServiceSerializer({
+            "saltroom": saltroom,
+            "subscription_plans": subscription_plans,
+            "session_pass": session_pass,
+        })
+
+        return Response({
+            "success": True,
+            "data": serializer.data,
+            "message": "Saltroom Service List",
         })
 
 # @extend_schema(
