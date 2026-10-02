@@ -28,9 +28,16 @@ class ActivitySessionSerializer(serializers.ModelSerializer):
         exclude = ['created_at', 'updated_at']
 
 
+class LunchroomSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Lunchroom
+        exclude = ['created_at', 'updated_at']
+
+
 class AllServicesSerializer(serializers.Serializer):
     sauna_seesion = SaunaSessionSerializer(many=True, required=False)
     activity_session = ActivitiesSerializer(many=True, required=False)
+    lunchroom = LunchroomSerializer(many=True, required=False)
 
 
 

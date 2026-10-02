@@ -21,11 +21,13 @@ class AllServicesView(APIView):
     def get(self, request):
         sauna_seesion = SaunaSeesion.objects.all()
         activity_session = Activities.objects.all()
+        lunchroom = Lunchroom.objects.all()
 
         serializer = AllServicesSerializer({
             "sauna_seesion": sauna_seesion,
             "activity_session": activity_session,
-        })
+            "lunchroom": lunchroom,
+        }, context={'request': request})
 
         return Response({
             "success": True,

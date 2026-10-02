@@ -90,6 +90,32 @@ class ActivitiesFeature(models.Model):
         return f"{self.feature}"
 
 
+
+class Lunchroom(models.Model):
+    title = models.CharField(max_length=100)
+    subtitle = models.CharField(max_length=100, default="")
+    description = models.TextField()
+    images = models.ImageField(upload_to="lunchroom", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.title}"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class ServiceFeature(models.Model):
     feature = models.CharField(max_length=100)
     created_at = models.DateTimeField(auto_now_add=True)
