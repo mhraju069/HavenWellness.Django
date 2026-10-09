@@ -13,16 +13,18 @@ class ServicesSerializer(serializers.ModelSerializer):
 
 #Activity services
 
-class ActivitiesSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Activities
-        exclude = ['created_at', 'updated_at']
-
-
 class ActivitiesFeatureSerializer(serializers.ModelSerializer):
     class Meta:
         model = ActivitiesFeature
         fields = ['id', 'feature']
+
+
+class ActivitiesSerializer(serializers.ModelSerializer):
+    features = ActivitiesFeatureSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Activities
+        exclude = ['created_at', 'updated_at']
 
 
 
