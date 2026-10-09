@@ -23,8 +23,6 @@ class Services(models.Model):
         return self.title
 
 
-
-
 class PrivateSauna(models.Model):
     base_price_3hrs = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     base_price_4hrs = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -49,8 +47,6 @@ class PrivateSaunaFeatures(models.Model):
         return f"Feature for {self.feature}"
 
 
-
-
 class SharedSauna(models.Model):
     price_per_person = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_available = models.BooleanField(default=True)
@@ -73,8 +69,6 @@ class SharedSaunaFeatures(models.Model):
         return f"Feature for {self.feature}"
 
 
-
-
 class Activities(models.Model):
     title = models.CharField(max_length=100)
     description = models.TextField()
@@ -95,8 +89,6 @@ class ActivitiesFeature(models.Model):
         return f"{self.feature}"
 
 
-
-
 class Lunchroom(models.Model):
     title = models.CharField(max_length=100)
     subtitle = models.CharField(max_length=100, default="")
@@ -107,8 +99,6 @@ class Lunchroom(models.Model):
 
     def __str__(self):
         return f"{self.title}"
-
-
 
 
 class Saltroom(models.Model):
@@ -134,8 +124,6 @@ class SaltroomFeatures(models.Model):
         return f"Feature for {self.feature}"
 
 
-
-
 class Packages(models.Model):
     title = models.CharField(max_length=100)
     packages = models.CharField(max_length=100)
@@ -155,17 +143,6 @@ class PackageFeatures(models.Model):
 
     def __str__(self):
         return f" {self.package.title} | {self.feature}"
-
-
-
-
-
-
-
-
-
-
-
 
 
 class ServiceFeature(models.Model):

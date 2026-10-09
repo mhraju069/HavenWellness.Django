@@ -7,8 +7,7 @@ from payments.serializers import SessionPassSerializer, SubscriptionPlansSeriali
 class ServicesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Services
-        exclude = ['created_at', 'updated_at']
-
+        fields = ['id','title','subtitle' , 'description','image' ,'type']
 
 
 #Activity services
@@ -27,14 +26,12 @@ class ActivitiesSerializer(serializers.ModelSerializer):
         exclude = ['created_at', 'updated_at']
 
 
-
 #Lunchroom services
 
 class LunchroomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lunchroom
         exclude = ['created_at', 'updated_at']
-
 
 
 #Saltroom services
@@ -53,7 +50,6 @@ class SaltroomSerializer(serializers.ModelSerializer):
         exclude = ['created_at', 'updated_at']
 
 
-
 #Sauna services
 
 class PrivateSaunaFeaturesSerializer(serializers.ModelSerializer):
@@ -61,8 +57,10 @@ class PrivateSaunaFeaturesSerializer(serializers.ModelSerializer):
         model = PrivateSaunaFeatures
         exclude = ['sauna', 'created_at', 'updated_at']
 
+
 class PrivateSaunaSerializer(serializers.ModelSerializer):
     features = PrivateSaunaFeaturesSerializer(many=True, read_only=True)
+
     class Meta:
         model = PrivateSauna
         exclude = ['created_at', 'updated_at']
@@ -73,8 +71,10 @@ class SharedSaunaFeaturesSerializer(serializers.ModelSerializer):
         model = SharedSaunaFeatures
         exclude = ['sauna', 'created_at', 'updated_at']
 
+
 class SharedSaunaSerializer(serializers.ModelSerializer):
     features = SharedSaunaFeaturesSerializer(many=True, read_only=True)
+
     class Meta:
         model = SharedSauna
         exclude = ['created_at', 'updated_at']
@@ -100,8 +100,10 @@ class PackageFeaturesSerializer(serializers.ModelSerializer):
         model = PackageFeatures
         fields = ['id', 'feature']
 
+
 class PackagesSerializer(serializers.ModelSerializer):
     features = PackageFeaturesSerializer(many=True, read_only=True)
+
     class Meta:
         model = Packages
         exclude = ['created_at', 'updated_at']

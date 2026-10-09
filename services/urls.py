@@ -3,5 +3,6 @@ from .views import *
 
 urlpatterns = [
     path('', AllServicesView.as_view()),
+    path('details/', ServiceDetailView.as_view()),
     path('details/<str:service_type>/', ServiceDetailView.as_view()),
 ]

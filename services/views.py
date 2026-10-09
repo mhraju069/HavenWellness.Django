@@ -50,8 +50,8 @@ class ServiceDetailView(APIView):
             ),
         ],
     )
-    def get(self, request, service_type):
-        s_type = service_type.lower()
+    def get(self, request, service_type=None):
+        s_type = (service_type or request.query_params.get('type') or '').lower()
 
         if not s_type:
             return Response({

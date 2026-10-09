@@ -18,15 +18,28 @@ CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 SECRET_KEY = os.getenv("SECRET_KEY", "83n^4v$htzuagc^ece+qzqkb9+jwp0o%(flpbu)_)izs84np0n")
 BASE_DIR = Path(__file__).resolve().parent.parent
-CORS_ALLOW_HEADERS = list(default_headers) + ['ngrok-skip-browser-warning',]
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'ngrok-skip-browser-warning',
+    'lang',
+    'accept-language',
+]
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760 * 400 # 400MB
-CORS_ALLOW_ORIGINS =  os.getenv('CORS_ALLOW_ORIGINS', 'localhost:8000,localhost:3000').split(',')
-CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', 'localhost:8000,localhost:3000').split(',')
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost',
+    'http://localhost:8000',
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1',
+    'http://127.0.0.1:8000',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5173',
+]
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 
 INSTALLED_APPS = [
+    'modeltranslation',
     'unfold',
     'channels',
     'corsheaders',
@@ -49,12 +62,22 @@ INSTALLED_APPS = [
     'notifications'
 ]
 
+LANGUAGES = (
+    ('en', 'English'),
+    ('nl', 'Dutch'),
+    ('de', 'German'),
+)
+
+MODELTRANSLATION_DEFAULT_LANGUAGE = 'en'
+MODELTRANSLATION_FALLBACK_LANGUAGES = ('en', 'nl', 'de')
+
 AUTH_USER_MODEL = "accounts.User"
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'core.middleware.LanguageMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
