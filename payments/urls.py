@@ -1,9 +1,14 @@
 from django.urls import path
-from .views import *
+from .views import (
+    CreatePaymentIntentAPIView,
+    StripeWebhookView,
+    PaymentSuccessView,
+    PaymentCancelView,
+)
 
 urlpatterns = [
-    # path('get-link/', GetPaymentLinkView.as_view(), name='get_payment_link'),
-    # path('webhook/', StripeWebhookView.as_view(), name='stripe_webhook'),
-    # path('success/', PaymentSuccessView.as_view(), name='success'),
-    # path('cancel/', PaymentCancelView.as_view(), name='cancel'),
+    path('create-intent/', CreatePaymentIntentAPIView.as_view(), name='create_payment_intent'),
+    path('webhook/', StripeWebhookView.as_view(), name='stripe_webhook'),
+    path('success/', PaymentSuccessView.as_view(), name='payment_success'),
+    path('cancel/', PaymentCancelView.as_view(), name='payment_cancel'),
 ]

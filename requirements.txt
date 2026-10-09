@@ -36,5 +36,6 @@ pillow
 cryptography
 PyJWT
 stripe
+dj-stripe
 firebase-admin
 django-fcm

@@ -14,14 +14,17 @@ except ImportError:
 
 DEBUG = True
 ALLOWED_HOSTS = ['*']
-CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https?://.*$",
+]
 SECRET_KEY = os.getenv("SECRET_KEY", "83n^4v$htzuagc^ece+qzqkb9+jwp0o%(flpbu)_)izs84np0n")
 BASE_DIR = Path(__file__).resolve().parent.parent
 CORS_ALLOW_HEADERS = list(default_headers) + [
     'ngrok-skip-browser-warning',
     'lang',
     'accept-language',
+    'authorization',
 ]
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760 * 400 # 400MB
 CSRF_TRUSTED_ORIGINS = [
@@ -33,10 +36,19 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:5173',
+    'https://crafty-rally-enjoyment.ngrok-free.dev',
 ]
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+
+STRIPE_TEST_PUBLIC_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
+STRIPE_TEST_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_LIVE_PUBLIC_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
+STRIPE_LIVE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_LIVE_MODE = False
+DJSTRIPE_FOREIGN_KEY_TO_FIELD = "id"
+DJSTRIPE_USE_NATIVE_JSONFIELD = True
 
 INSTALLED_APPS = [
     'modeltranslation',
@@ -53,6 +65,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'drf_spectacular',
+    'djstripe',
     'accounts',
     'services',
     'bookings',

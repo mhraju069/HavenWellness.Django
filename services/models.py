@@ -1,6 +1,14 @@
 from django.core.files import images
 from django.db import models
 
+class ServiceSettings(models.Model):
+    open_time = models.TimeField()
+    close_time = models.TimeField()
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
 # Create your models here.
 class Services(models.Model):
     SERVICE_TYPES = [
@@ -154,7 +162,7 @@ class ServiceFeature(models.Model):
         return f"Feature for {self.feature}"
 
 
-class ExcludeDate(models.Model):
+class BlockDate(models.Model):
     date = models.DateField()
     description = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -162,3 +170,16 @@ class ExcludeDate(models.Model):
 
     def __str__(self):
         return f"Exclude Date for {self.date}"
+
+
+class SpecialOpeningDate(models.Model):
+    date = models.DateField()
+    open_time = models.TimeField()
+    close_time = models.TimeField()
+    description = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Special Opening Date for {self.date}"
+    

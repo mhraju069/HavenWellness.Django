@@ -5,52 +5,6 @@ info:
   description: Comprehensive REST API documentation for Haven Wellness services, bookings,
     user accounts, dashboards, payments, and notifications.
 paths:
-  /api/auth/:
-    post:
-      operationId: auth_create
-      summary: Authenticate or register user via Firebase ID Token
-      parameters:
-      - in: query
-        name: oauth
-        schema:
-          type: boolean
-          default: true
-        description: Whether login is via OAuth provider
-      - in: query
-        name: token
-        schema:
-          type: string
-        description: Firebase ID Token
-        required: true
-      tags:
-      - Accounts
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/FirebaseLoginRequestRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/FirebaseLoginRequestRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/FirebaseLoginRequestRequest'
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FirebaseLoginResponse'
-          description: ''
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GetOtpResponse'
-          description: ''
   /api/auth/get-otp/:
     post:
       operationId: auth_get_otp_create
@@ -84,6 +38,80 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetOtpResponse'
+          description: ''
+  /api/auth/login/:
+    post:
+      operationId: auth_login_create
+      summary: Login user with email and password
+      tags:
+      - Accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+          description: ''
+  /api/auth/register/:
+    post:
+      operationId: auth_register_create
+      summary: Register a new user
+      tags:
+      - Accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
           description: ''
   /api/auth/token/refresh/:
     post:
@@ -237,10 +265,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/GetOtpResponse'
           description: ''
-  /api/bookings/:
+  /api/bookings/sauna/:
     get:
-      operationId: bookings_list
-      summary: List or create bookings for the authenticated user
+      operationId: bookings_sauna_list
+      summary: Create or List Sauna Bookings (Shared & Private)
       parameters:
       - name: cursor
         required: false
@@ -258,22 +286,23 @@ paths:
       - Bookings
       security:
       - jwtAuth: []
+      - {}
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedBookingList'
+                $ref: '#/components/schemas/PaginatedSaunaBookingList'
           description: ''
         '201':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedBookingList'
+                $ref: '#/components/schemas/PaginatedSaunaBookingList'
           description: ''
     post:
-      operationId: bookings_create
-      summary: List or create bookings for the authenticated user
+      operationId: bookings_sauna_create
+      summary: Create or List Sauna Bookings (Shared & Private)
       parameters:
       - name: cursor
         required: false
@@ -293,33 +322,34 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BookingRequest'
+              $ref: '#/components/schemas/SaunaBookingRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/BookingRequest'
+              $ref: '#/components/schemas/SaunaBookingRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/BookingRequest'
+              $ref: '#/components/schemas/SaunaBookingRequest'
         required: true
       security:
       - jwtAuth: []
+      - {}
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedBookingList'
+                $ref: '#/components/schemas/PaginatedSaunaBookingList'
           description: ''
         '201':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Booking'
+                $ref: '#/components/schemas/SaunaBooking'
           description: ''
-  /api/bookings/slots/:
+  /api/bookings/sauna/confirm/:
     get:
-      operationId: bookings_slots_list
-      summary: Get available time slots for a given date and service
+      operationId: bookings_sauna_confirm_list
+      summary: Create or List Sauna Bookings (Shared & Private)
       parameters:
       - name: cursor
         required: false
@@ -327,166 +357,33 @@ paths:
         description: The pagination cursor value.
         schema:
           type: string
-      - in: query
-        name: date
-        schema:
-          type: string
-          format: date
-        description: Booking date (YYYY-MM-DD)
-        required: true
       - name: ordering
         required: false
         in: query
         description: Which field to use when ordering the results.
         schema:
           type: string
-      - in: query
-        name: service
-        schema:
-          type: string
-        description: Service title (e.g. private_sauna)
-        required: true
       tags:
       - Bookings
       security:
       - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedTimeSlotList'
-          description: ''
-        '400':
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: {}
-          description: ''
-  /api/dashboard/:
-    get:
-      operationId: dashboard_retrieve
-      summary: Get admin dashboard overview metrics and today's bookings
-      tags:
-      - Dashboard
-      security:
-      - jwtAuth: []
       - {}
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DashboardSummaryResponse'
-          description: ''
-  /api/dashboard/access-codes/:
-    get:
-      operationId: dashboard_access_codes_list
-      summary: List active access codes for sauna services
-      parameters:
-      - in: query
-        name: booking__service
-        schema:
-          type: string
-          enum:
-          - activity
-          - arrangement
-          - lunchroom
-          - private_sauna
-          - shared_sauna
-        description: |-
-          * `private_sauna` - Private Sauna
-          * `shared_sauna` - Shared Sauna
-          * `arrangement` - Arrangement
-          * `activity` - Activity
-          * `lunchroom` - Lunchroom
-      - name: cursor
-        required: false
-        in: query
-        description: The pagination cursor value.
-        schema:
-          type: string
-      - in: query
-        name: is_active
-        schema:
-          type: boolean
-      - in: query
-        name: is_used
-        schema:
-          type: boolean
-      - name: ordering
-        required: false
-        in: query
-        description: Which field to use when ordering the results.
-        schema:
-          type: string
-      tags:
-      - Dashboard
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedAccessCodeList'
-          description: ''
-  /api/dashboard/capacity/:
-    get:
-      operationId: dashboard_capacity_retrieve
-      summary: Get capacity status breakdown per service
-      tags:
-      - Dashboard
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CapacityListResponse'
-          description: ''
-  /api/dashboard/exclude-dates/:
-    get:
-      operationId: dashboard_exclude_dates_list
-      summary: List or create excluded date entries for services
-      parameters:
-      - name: cursor
-        required: false
-        in: query
-        description: The pagination cursor value.
-        schema:
-          type: string
-      - name: ordering
-        required: false
-        in: query
-        description: Which field to use when ordering the results.
-        schema:
-          type: string
-      tags:
-      - Dashboard
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedDashboardExcludeDateList'
+                $ref: '#/components/schemas/PaginatedSaunaBookingList'
           description: ''
         '201':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedDashboardExcludeDateList'
+                $ref: '#/components/schemas/PaginatedSaunaBookingList'
           description: ''
     post:
-      operationId: dashboard_exclude_dates_create
-      summary: List or create excluded date entries for services
+      operationId: bookings_sauna_confirm_create
+      summary: Create or List Sauna Bookings (Shared & Private)
       parameters:
       - name: cursor
         required: false
@@ -501,18 +398,18 @@ paths:
         schema:
           type: string
       tags:
-      - Dashboard
+      - Bookings
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DashboardExcludeDateRequest'
+              $ref: '#/components/schemas/SaunaBookingRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/DashboardExcludeDateRequest'
+              $ref: '#/components/schemas/SaunaBookingRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/DashboardExcludeDateRequest'
+              $ref: '#/components/schemas/SaunaBookingRequest'
         required: true
       security:
       - jwtAuth: []
@@ -522,227 +419,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedDashboardExcludeDateList'
+                $ref: '#/components/schemas/PaginatedSaunaBookingList'
           description: ''
         '201':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DashboardExcludeDate'
-          description: ''
-  /api/dashboard/exclude-dates/{id}/:
-    get:
-      operationId: dashboard_exclude_dates_retrieve
-      summary: Retrieve, update or delete an excluded date entry
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - Dashboard
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DashboardExcludeDate'
-          description: ''
-    put:
-      operationId: dashboard_exclude_dates_update
-      summary: Retrieve, update or delete an excluded date entry
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - Dashboard
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DashboardExcludeDateRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/DashboardExcludeDateRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/DashboardExcludeDateRequest'
-        required: true
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DashboardExcludeDate'
-          description: ''
-    patch:
-      operationId: dashboard_exclude_dates_partial_update
-      summary: Retrieve, update or delete an excluded date entry
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - Dashboard
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedDashboardExcludeDateRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedDashboardExcludeDateRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedDashboardExcludeDateRequest'
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DashboardExcludeDate'
-          description: ''
-    delete:
-      operationId: dashboard_exclude_dates_destroy
-      summary: Retrieve, update or delete an excluded date entry
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - Dashboard
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DashboardExcludeDate'
-          description: ''
-  /api/dashboard/payments/:
-    get:
-      operationId: dashboard_payments_list
-      summary: List all completed/paid payment records
-      tags:
-      - Dashboard
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Payment'
-          description: ''
-  /api/dashboard/reservations/:
-    get:
-      operationId: dashboard_reservations_list
-      summary: List all reservations with filtering and ordering
-      parameters:
-      - name: cursor
-        required: false
-        in: query
-        description: The pagination cursor value.
-        schema:
-          type: string
-      - name: ordering
-        required: false
-        in: query
-        description: Which field to use when ordering the results.
-        schema:
-          type: string
-      - in: query
-        name: payment_status
-        schema:
-          type: string
-          enum:
-          - on_site
-          - paid
-          - pending
-        description: |-
-          * `pending` - Pending
-          * `paid` - Paid
-          * `on_site` - On Site
-      - in: query
-        name: service
-        schema:
-          type: string
-          enum:
-          - activity
-          - arrangement
-          - lunchroom
-          - private_sauna
-          - shared_sauna
-        description: |-
-          * `private_sauna` - Private Sauna
-          * `shared_sauna` - Shared Sauna
-          * `arrangement` - Arrangement
-          * `activity` - Activity
-          * `lunchroom` - Lunchroom
-      - in: query
-        name: status
-        schema:
-          type: string
-          enum:
-          - cancelled
-          - confirmed
-        description: |-
-          * `confirmed` - Confirmed
-          * `cancelled` - Cancelled
-      - in: query
-        name: time_slot__date
-        schema:
-          type: string
-          format: date
-      tags:
-      - Dashboard
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedBookingList'
-          description: ''
-  /api/dashboard/services/:
-    get:
-      operationId: dashboard_services_retrieve
-      summary: Get service statistics and aggregated details
-      tags:
-      - Dashboard
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ServiceStatsResponse'
+                $ref: '#/components/schemas/SaunaBooking'
           description: ''
   /api/notify/:
     get:
@@ -815,30 +498,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaymentMessageResponse'
           description: ''
-  /api/payments/get-link/:
+  /api/payments/create-checkout-session/:
     post:
-      operationId: payments_get_link_create
-      summary: Generate Stripe checkout payment link or payment intent for a booking
-      parameters:
-      - in: query
-        name: method
-        schema:
-          type: string
-          default: web
-        description: Payment flow method ('web' or 'app')
+      operationId: payments_create_checkout_session_create
+      summary: Create Stripe Checkout Session for a Booking
       tags:
       - Payments
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GetPaymentLinkRequestRequest'
+              $ref: '#/components/schemas/CreateCheckoutSessionRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/GetPaymentLinkRequestRequest'
+              $ref: '#/components/schemas/CreateCheckoutSessionRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/GetPaymentLinkRequestRequest'
+              $ref: '#/components/schemas/CreateCheckoutSessionRequest'
         required: true
       security:
       - jwtAuth: []
@@ -848,7 +524,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GetPaymentLinkResponse'
+                $ref: '#/components/schemas/CreateCheckoutSessionResponse'
           description: ''
         '400':
           content:
@@ -882,7 +558,7 @@ paths:
   /api/payments/webhook/:
     post:
       operationId: payments_webhook_create
-      summary: Stripe Webhook handler
+      summary: Stripe Webhook Handler
       tags:
       - Payments
       requestBody:
@@ -917,250 +593,126 @@ paths:
   /api/services/:
     get:
       operationId: services_list
-      summary: List all active services or create a new service
+      summary: List all Services
       parameters:
-      - name: cursor
-        required: false
-        in: query
-        description: The pagination cursor value.
-        schema:
-          type: string
       - in: query
-        name: title
+        name: type
         schema:
           type: string
-          enum:
-          - activity
-          - arrangement
-          - lunchroom
-          - private_sauna
-          - shared_sauna
-        description: |-
-          * `private_sauna` - Private Sauna
-          * `shared_sauna` - Shared Sauna
-          * `arrangement` - Arrangement
-          * `activity` - Activity
-          * `lunchroom` - Lunchroom
+        description: Filter by service type (sauna, activity, saltroom, package, event,
+          lunchroom)
       tags:
       - Services
       security:
       - jwtAuth: []
+      - {}
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedServiceList'
+                type: array
+                items:
+                  $ref: '#/components/schemas/Services'
           description: ''
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedServiceList'
-          description: ''
-    post:
-      operationId: services_create
-      summary: List all active services or create a new service
-      parameters:
-      - name: cursor
-        required: false
-        in: query
-        description: The pagination cursor value.
-        schema:
-          type: string
-      - in: query
-        name: title
-        schema:
-          type: string
-          enum:
-          - activity
-          - arrangement
-          - lunchroom
-          - private_sauna
-          - shared_sauna
-        description: |-
-          * `private_sauna` - Private Sauna
-          * `shared_sauna` - Shared Sauna
-          * `arrangement` - Arrangement
-          * `activity` - Activity
-          * `lunchroom` - Lunchroom
-      tags:
-      - Services
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ServiceRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ServiceRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ServiceRequest'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedServiceList'
-          description: ''
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Service'
-          description: ''
-  /api/services/exclude-date/:
+  /api/services/details/:
     get:
-      operationId: services_exclude_date_list
-      summary: List or create excluded dates for services
+      operationId: services_details_retrieve
+      summary: Get Service Details by Type
       parameters:
-      - name: cursor
-        required: false
-        in: query
-        description: The pagination cursor value.
+      - in: query
+        name: type
         schema:
           type: string
-      - in: query
-        name: service
-        schema:
-          type: array
-          items:
-            type: string
-            enum:
-            - activity
-            - arrangement
-            - lunchroom
-            - private_sauna
-            - shared_sauna
-        description: |-
-          * `private_sauna` - Private Sauna
-          * `shared_sauna` - Shared Sauna
-          * `arrangement` - Arrangement
-          * `activity` - Activity
-          * `lunchroom` - Lunchroom
-        explode: true
-        style: form
+        description: 'Service type: ''sauna'', ''activity'', ''saltroom'', ''package'',
+          ''lunchroom'', ''event'''
       tags:
       - Services
       security:
       - jwtAuth: []
+      - {}
       responses:
         '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedExcludeDateList'
-          description: ''
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedExcludeDateList'
-          description: ''
-    post:
-      operationId: services_exclude_date_create
-      summary: List or create excluded dates for services
-      parameters:
-      - name: cursor
-        required: false
-        in: query
-        description: The pagination cursor value.
-        schema:
-          type: string
-      - in: query
-        name: service
-        schema:
-          type: array
-          items:
-            type: string
-            enum:
-            - activity
-            - arrangement
-            - lunchroom
-            - private_sauna
-            - shared_sauna
-        description: |-
-          * `private_sauna` - Private Sauna
-          * `shared_sauna` - Shared Sauna
-          * `arrangement` - Arrangement
-          * `activity` - Activity
-          * `lunchroom` - Lunchroom
-        explode: true
-        style: form
-      tags:
-      - Services
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ExcludeDateRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ExcludeDateRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ExcludeDateRequest'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedExcludeDateList'
-          description: ''
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExcludeDate'
-          description: ''
-  /api/services/exclude-date/{id}/:
+          description: No response body
+  /api/services/details/{service_type}/:
     get:
-      operationId: services_exclude_date_retrieve
-      summary: Retrieve or delete an excluded date for a service
+      operationId: services_details_retrieve_2
+      summary: Get Service Details by Type
       parameters:
       - in: path
-        name: id
+        name: service_type
         schema:
-          type: integer
+          type: string
         required: true
+      - in: query
+        name: type
+        schema:
+          type: string
+        description: 'Service type: ''sauna'', ''activity'', ''saltroom'', ''package'',
+          ''lunchroom'', ''event'''
       tags:
       - Services
       security:
       - jwtAuth: []
+      - {}
       responses:
         '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExcludeDate'
-          description: ''
-    delete:
-      operationId: services_exclude_date_destroy
-      summary: Retrieve or delete an excluded date for a service
+          description: No response body
+  /api/services/slots/:
+    get:
+      operationId: services_slots_retrieve
+      summary: Get available slots for a service (sauna, saltroom, activity, lunchroom,
+        event)
       parameters:
-      - in: path
-        name: id
+      - in: query
+        name: date
         schema:
-          type: integer
+          type: string
+        description: Date (YYYY-MM-DD)
         required: true
+      - in: query
+        name: type
+        schema:
+          type: string
+        description: Service Type (e.g. sauna, private_sauna, shared_sauna)
       tags:
       - Services
       security:
       - jwtAuth: []
+      - {}
       responses:
         '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExcludeDate'
-          description: ''
+          description: No response body
+  /api/services/slots/{service_type}/:
+    get:
+      operationId: services_slots_retrieve_2
+      summary: Get available slots for a service (sauna, saltroom, activity, lunchroom,
+        event)
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+        description: Date (YYYY-MM-DD)
+        required: true
+      - in: path
+        name: service_type
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: type
+        schema:
+          type: string
+        description: Service Type (e.g. sauna, private_sauna, shared_sauna)
+      tags:
+      - Services
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
   /api/token/:
     post:
       operationId: token_create
@@ -1217,265 +769,70 @@ paths:
           description: ''
 components:
   schemas:
-    AccessCode:
+    AuthResponse:
       type: object
       properties:
-        id:
-          type: integer
-          readOnly: true
-        code:
-          type: string
-          readOnly: true
-        valid_from:
-          type: string
-          format: date-time
-        valid_until:
-          type: string
-          format: date-time
-        is_used:
+        status:
           type: boolean
-        is_active:
-          type: boolean
-        created_at:
+        log:
           type: string
-          format: date-time
-          readOnly: true
-        updated_at:
+        access:
           type: string
-          format: date-time
-          readOnly: true
-        booking:
-          type: integer
+          description: JWT Access Token
+        refresh:
+          type: string
+          description: JWT Refresh Token
+        user:
+          $ref: '#/components/schemas/UserProfile'
       required:
-      - booking
-      - code
-      - created_at
-      - id
-      - updated_at
-      - valid_until
-    Booking:
+      - log
+      - status
+    CreateCheckoutSessionRequest:
       type: object
       properties:
-        id:
-          type: integer
-          readOnly: true
-        guests_count:
-          type: integer
-          default: 1
-          description: Number of guests for the booking
-        access_code:
-          allOf:
-          - $ref: '#/components/schemas/AccessCode'
-          readOnly: true
-          description: Access code details if applicable for sauna services
-        name:
-          type: string
-          nullable: true
-          maxLength: 100
-        phone:
-          type: string
-          nullable: true
-          maxLength: 15
-        email:
-          nullable: true
-          oneOf:
-          - type: string
-            format: email
-            maxLength: 254
-          - type: string
-            maxLength: 0
-        note:
-          type: string
-          nullable: true
         booking_id:
           type: string
-          readOnly: true
-        status:
-          $ref: '#/components/schemas/StatusEnum'
-        payment_status:
-          $ref: '#/components/schemas/BookingPaymentStatusEnum'
-        price:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
-        time_slot:
-          type: integer
-        user:
-          type: integer
-          readOnly: true
-        service:
-          $ref: '#/components/schemas/ServiceEnum'
-      required:
-      - access_code
-      - booking_id
-      - created_at
-      - id
-      - service
-      - time_slot
-      - updated_at
-      - user
-    BookingPaymentStatusEnum:
-      enum:
-      - pending
-      - paid
-      - on_site
-      type: string
-      description: |-
-        * `pending` - Pending
-        * `paid` - Paid
-        * `on_site` - On Site
-    BookingRequest:
-      type: object
-      properties:
-        guests_count:
-          type: integer
-          default: 1
-          description: Number of guests for the booking
-        name:
-          type: string
-          nullable: true
+          minLength: 1
+          description: Booking ID, e.g. SS-0001 or PS-0001 or numeric ID
           maxLength: 100
-        phone:
-          type: string
-          nullable: true
-          maxLength: 15
-        email:
-          nullable: true
-          oneOf:
-          - type: string
-            format: email
-            maxLength: 254
-          - type: string
-            maxLength: 0
-        note:
-          type: string
-          nullable: true
-        status:
-          $ref: '#/components/schemas/StatusEnum'
-        payment_status:
-          $ref: '#/components/schemas/BookingPaymentStatusEnum'
-        price:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
-        time_slot:
-          type: integer
-        service:
-          $ref: '#/components/schemas/ServiceEnum'
-      required:
-      - service
-      - time_slot
-    CapacityItem:
-      type: object
-      properties:
-        service:
-          type: string
-        total_capacity:
-          type: integer
-        total_booked:
-          type: integer
-        total_available:
-          type: integer
-      required:
-      - service
-      - total_available
-      - total_booked
-      - total_capacity
-    CapacityListResponse:
-      type: object
-      properties:
-        services:
-          type: array
-          items:
-            $ref: '#/components/schemas/Service'
-        capacity:
-          type: array
-          items:
-            $ref: '#/components/schemas/CapacityItem'
-      required:
-      - capacity
-      - services
-    DashboardExcludeDate:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        date:
-          type: string
-          format: date
-        description:
-          type: string
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
-        service:
-          type: array
-          items:
-            $ref: '#/components/schemas/ServiceEnum'
-      required:
-      - created_at
-      - date
-      - description
-      - id
-      - service
-      - updated_at
-    DashboardExcludeDateRequest:
-      type: object
-      properties:
-        date:
-          type: string
-          format: date
-        description:
+        service_type:
           type: string
           minLength: 1
-        service:
-          type: array
-          items:
-            $ref: '#/components/schemas/ServiceEnum'
+          default: sauna
+          description: Type of service (e.g. sauna, saltroom)
+          maxLength: 50
+        success_url:
+          type: string
+          format: uri
+          minLength: 1
+          description: Redirect URL after successful payment
+        cancel_url:
+          type: string
+          format: uri
+          minLength: 1
+          description: Redirect URL after cancelled payment
       required:
-      - date
-      - description
-      - service
-    DashboardSummaryResponse:
+      - booking_id
+    CreateCheckoutSessionResponse:
       type: object
       properties:
-        today_reservations:
+        status:
+          type: boolean
+          default: true
+        checkout_url:
+          type: string
+          format: uri
+        session_id:
+          type: string
+        booking_id:
+          type: string
+        payment_id:
           type: integer
-        upcoming_reservations:
-          type: integer
-        active_codes:
-          type: integer
-        pending_payments:
-          type: integer
-        today_bookings_list:
-          type: array
-          items:
-            $ref: '#/components/schemas/Booking'
-        service_bookings_count:
-          type: object
-          additionalProperties:
-            type: integer
       required:
-      - active_codes
-      - pending_payments
-      - service_bookings_count
-      - today_bookings_list
-      - today_reservations
-      - upcoming_reservations
+      - booking_id
+      - checkout_url
+      - payment_id
+      - session_id
     DeviceRegisterResponse:
       type: object
       properties:
@@ -1491,83 +848,6 @@ components:
           minLength: 1
       required:
       - token
-    ExcludeDate:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        date:
-          type: string
-          format: date
-        description:
-          type: string
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
-        service:
-          type: array
-          items:
-            $ref: '#/components/schemas/ServiceEnum'
-      required:
-      - created_at
-      - date
-      - description
-      - id
-      - service
-      - updated_at
-    ExcludeDateRequest:
-      type: object
-      properties:
-        date:
-          type: string
-          format: date
-        description:
-          type: string
-          minLength: 1
-        service:
-          type: array
-          items:
-            $ref: '#/components/schemas/ServiceEnum'
-      required:
-      - date
-      - description
-      - service
-    FirebaseLoginRequestRequest:
-      type: object
-      properties:
-        name:
-          type: string
-          description: User name when oauth is false
-    FirebaseLoginResponse:
-      type: object
-      properties:
-        access:
-          type: string
-          description: JWT Access Token
-        refresh:
-          type: string
-          description: JWT Refresh Token
-        user:
-          $ref: '#/components/schemas/UserProfile'
-        status:
-          type: boolean
-        active:
-          type: boolean
-        log:
-          type: string
-      required:
-      - access
-      - active
-      - log
-      - refresh
-      - status
-      - user
     GetOtpRequestRequest:
       type: object
       properties:
@@ -1592,24 +872,6 @@ components:
       required:
       - log
       - status
-    GetPaymentLinkRequestRequest:
-      type: object
-      properties:
-        booking_id:
-          type: integer
-          description: ID of the booking to generate payment link for
-      required:
-      - booking_id
-    GetPaymentLinkResponse:
-      type: object
-      properties:
-        status:
-          type: boolean
-        log:
-          description: Stripe Payment Intent / Checkout Session URL or data
-      required:
-      - log
-      - status
     LanguageEnum:
       enum:
       - en
@@ -1620,6 +882,22 @@ components:
         * `en` - English
         * `de` - German
         * `nl` - Dutch
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: User's email address
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: User's password
+      required:
+      - email
+      - password
     Notification:
       type: object
       properties:
@@ -1689,7 +967,7 @@ components:
       - access
       - refresh
       - user
-    PaginatedAccessCodeList:
+    PaginatedSaunaBookingList:
       type: object
       required:
       - results
@@ -1707,115 +985,7 @@ components:
         results:
           type: array
           items:
-            $ref: '#/components/schemas/AccessCode'
-    PaginatedBookingList:
-      type: object
-      required:
-      - results
-      properties:
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?cursor=cD00ODY%3D"
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/Booking'
-    PaginatedDashboardExcludeDateList:
-      type: object
-      required:
-      - results
-      properties:
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?cursor=cD00ODY%3D"
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/DashboardExcludeDate'
-    PaginatedExcludeDateList:
-      type: object
-      required:
-      - results
-      properties:
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?cursor=cD00ODY%3D"
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExcludeDate'
-    PaginatedServiceList:
-      type: object
-      required:
-      - results
-      properties:
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?cursor=cD00ODY%3D"
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/Service'
-    PaginatedTimeSlotList:
-      type: object
-      required:
-      - results
-      properties:
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?cursor=cD00ODY%3D"
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/TimeSlot'
-    PatchedDashboardExcludeDateRequest:
-      type: object
-      properties:
-        date:
-          type: string
-          format: date
-        description:
-          type: string
-          minLength: 1
-        service:
-          type: array
-          items:
-            $ref: '#/components/schemas/ServiceEnum'
+            $ref: '#/components/schemas/SaunaBooking'
     PatchedUserProfileRequest:
       type: object
       properties:
@@ -1848,75 +1018,6 @@ components:
           writeOnly: true
           minLength: 1
           description: New password
-    Payment:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        client:
-          allOf:
-          - $ref: '#/components/schemas/PaymentClient'
-          readOnly: true
-        service:
-          allOf:
-          - $ref: '#/components/schemas/PaymentService'
-          readOnly: true
-        booking:
-          allOf:
-          - $ref: '#/components/schemas/PaymentBooking'
-          readOnly: true
-        amount:
-          type: number
-          format: double
-        payment_date:
-          type: string
-          format: date-time
-        payment_status:
-          $ref: '#/components/schemas/PaymentPaymentStatusEnum'
-        transaction_id:
-          type: string
-          maxLength: 20
-        invoice_url:
-          nullable: true
-          oneOf:
-          - type: string
-            format: uri
-            maxLength: 200
-          - type: string
-            maxLength: 0
-      required:
-      - amount
-      - booking
-      - client
-      - id
-      - service
-      - transaction_id
-    PaymentBooking:
-      type: object
-      properties:
-        booking_id:
-          type: string
-        time_slot:
-          type: string
-        booking_capacity:
-          type: integer
-      required:
-      - booking_capacity
-      - booking_id
-      - time_slot
-    PaymentClient:
-      type: object
-      properties:
-        name:
-          type: string
-          nullable: true
-        email:
-          type: string
-          format: email
-      required:
-      - email
-      - name
     PaymentMessageResponse:
       type: object
       properties:
@@ -1924,36 +1025,33 @@ components:
           type: string
       required:
       - message
-    PaymentPaymentStatusEnum:
+    PaymentStatusEnum:
       enum:
       - pending
       - paid
-      - failed
       type: string
       description: |-
         * `pending` - Pending
         * `paid` - Paid
-        * `failed` - Failed
-    PaymentService:
+    RegisterRequest:
       type: object
       properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: User's email address
+        password:
+          type: string
+          writeOnly: true
+          minLength: 6
+          description: User's password
         name:
           type: string
-        duration:
-          type: integer
+          description: User's full name
       required:
-      - duration
-      - name
-    PaymentTypeEnum:
-      enum:
-      - full
-      - partial
-      - on_spot
-      type: string
-      description: |-
-        * `full` - Full Payment
-        * `partial` - Partial Payment
-        * `on_spot` - On Spot Payment
+      - email
+      - password
     RoleEnum:
       enum:
       - user
@@ -1962,45 +1060,63 @@ components:
       description: |-
         * `user` - User
         * `admin` - Admin
-    Service:
+    SaunaBooking:
       type: object
       properties:
-        title:
-          $ref: '#/components/schemas/TitleEnum'
-        images:
-          type: array
-          items:
-            $ref: '#/components/schemas/ServiceImage'
+        id:
+          type: integer
           readOnly: true
-        features:
-          type: array
-          items:
-            $ref: '#/components/schemas/ServiceFeature'
-          readOnly: true
-        subtitle:
+        name:
+          type: string
+          description: Guest Name (Required)
+        email:
+          type: string
+          format: email
+          description: Guest Email (Required)
+        phone:
+          type: string
+          description: Guest Phone Number (Required)
+        special_request:
           type: string
           nullable: true
-          maxLength: 100
-        description:
+          description: Special Request or Comment (Optional)
+        booking_id:
           type: string
+          readOnly: true
+        sauna_type:
+          $ref: '#/components/schemas/SaunaTypeEnum'
+        booking_date:
+          type: string
+          format: date
+        booking_time:
+          type: string
+          format: time
+        time_slot:
+          allOf:
+          - $ref: '#/components/schemas/TimeSlotEnum'
+          description: |-
+            3 Hours or 4 Hours slot
+
+            * `90_mins` - 90 Minutes
+            * `3_hours` - 3 Hours
+            * `4_hours` - 4 Hours
         capacity:
           type: integer
           maximum: 9223372036854775807
-          minimum: -9223372036854775808
+          minimum: 0
           format: int64
-        duration:
-          type: integer
-          maximum: 9223372036854775807
-          minimum: -9223372036854775808
-          format: int64
-        price:
+          description: Capacity / guest count
+        selected_features:
+          nullable: true
+          description: List of selected extra features
+        total_price:
           type: string
           format: decimal
           pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
-        payment_type:
-          $ref: '#/components/schemas/PaymentTypeEnum'
-        is_active:
-          type: boolean
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        payment_status:
+          $ref: '#/components/schemas/PaymentStatusEnum'
         created_at:
           type: string
           format: date-time
@@ -2009,64 +1125,90 @@ components:
           type: string
           format: date-time
           readOnly: true
-      required:
-      - created_at
-      - description
-      - features
-      - images
-      - updated_at
-    ServiceEnum:
-      enum:
-      - private_sauna
-      - shared_sauna
-      - arrangement
-      - activity
-      - lunchroom
-      type: string
-      description: |-
-        * `private_sauna` - Private Sauna
-        * `shared_sauna` - Shared Sauna
-        * `arrangement` - Arrangement
-        * `activity` - Activity
-        * `lunchroom` - Lunchroom
-    ServiceFeature:
-      type: object
-      properties:
-        id:
+        user:
           type: integer
           readOnly: true
-        feature:
-          type: string
-          maxLength: 100
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
-        service:
-          $ref: '#/components/schemas/ServiceEnum'
+          nullable: true
       required:
+      - booking_date
+      - booking_id
+      - booking_time
       - created_at
-      - feature
+      - email
       - id
-      - service
+      - name
+      - phone
       - updated_at
-    ServiceFeatureRequest:
+      - user
+    SaunaBookingRequest:
       type: object
       properties:
-        feature:
+        name:
           type: string
           minLength: 1
-          maxLength: 100
-        service:
-          $ref: '#/components/schemas/ServiceEnum'
+          description: Guest Name (Required)
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: Guest Email (Required)
+        phone:
+          type: string
+          minLength: 1
+          description: Guest Phone Number (Required)
+        special_request:
+          type: string
+          nullable: true
+          description: Special Request or Comment (Optional)
+        sauna_type:
+          $ref: '#/components/schemas/SaunaTypeEnum'
+        booking_date:
+          type: string
+          format: date
+        booking_time:
+          type: string
+          format: time
+        time_slot:
+          allOf:
+          - $ref: '#/components/schemas/TimeSlotEnum'
+          description: |-
+            3 Hours or 4 Hours slot
+
+            * `90_mins` - 90 Minutes
+            * `3_hours` - 3 Hours
+            * `4_hours` - 4 Hours
+        capacity:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          description: Capacity / guest count
+        selected_features:
+          nullable: true
+          description: List of selected extra features
+        total_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        payment_status:
+          $ref: '#/components/schemas/PaymentStatusEnum'
       required:
-      - feature
-      - service
-    ServiceImage:
+      - booking_date
+      - booking_time
+      - email
+      - name
+      - phone
+    SaunaTypeEnum:
+      enum:
+      - shared
+      - private
+      type: string
+      description: |-
+        * `shared` - Shared Sauna
+        * `private` - Private Sauna
+    Services:
       type: object
       properties:
         id:
@@ -2074,161 +1216,43 @@ components:
           readOnly: true
         title:
           type: string
-          nullable: true
           maxLength: 100
+        subtitle:
+          type: string
+          maxLength: 100
+        description:
+          type: string
         image:
           type: string
           format: uri
           nullable: true
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
-        service:
-          $ref: '#/components/schemas/ServiceEnum'
-      required:
-      - created_at
-      - id
-      - service
-      - updated_at
-    ServiceImageRequest:
-      type: object
-      properties:
-        title:
-          type: string
-          nullable: true
-          maxLength: 100
-        image:
-          type: string
-          format: binary
-          nullable: true
-        service:
-          $ref: '#/components/schemas/ServiceEnum'
-      required:
-      - service
-    ServiceRequest:
-      type: object
-      properties:
-        title:
-          $ref: '#/components/schemas/TitleEnum'
-        subtitle:
-          type: string
-          nullable: true
-          maxLength: 100
-        description:
-          type: string
-          minLength: 1
-        capacity:
-          type: integer
-          maximum: 9223372036854775807
-          minimum: -9223372036854775808
-          format: int64
-        duration:
-          type: integer
-          maximum: 9223372036854775807
-          minimum: -9223372036854775808
-          format: int64
-        price:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
-        payment_type:
-          $ref: '#/components/schemas/PaymentTypeEnum'
-        is_active:
-          type: boolean
+        type:
+          $ref: '#/components/schemas/TypeEnum'
       required:
       - description
-    ServiceStatsResponse:
-      type: object
-      properties:
-        total_services:
-          type: integer
-        total_active_services:
-          type: integer
-        total_capacity:
-          type: integer
-        average_price:
-          type: number
-          format: double
-        average_duration:
-          type: number
-          format: double
-        services:
-          type: array
-          items:
-            $ref: '#/components/schemas/Service'
-      required:
-      - average_duration
-      - average_price
-      - services
-      - total_active_services
-      - total_capacity
-      - total_services
+      - id
+      - title
+      - type
     StatusEnum:
       enum:
+      - pending
       - confirmed
       - cancelled
       type: string
       description: |-
+        * `pending` - Pending
         * `confirmed` - Confirmed
         * `cancelled` - Cancelled
-    TimeSlot:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        available_capacity:
-          type: integer
-          readOnly: true
-          description: Remaining available capacity for the slot
-        time:
-          type: string
-          readOnly: true
-        date:
-          type: string
-          format: date
-        booked_capacity:
-          type: integer
-          maximum: 9223372036854775807
-          minimum: -9223372036854775808
-          format: int64
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
-        slot:
-          type: integer
-      required:
-      - available_capacity
-      - created_at
-      - date
-      - id
-      - slot
-      - time
-      - updated_at
-    TitleEnum:
+    TimeSlotEnum:
       enum:
-      - private_sauna
-      - shared_sauna
-      - arrangement
-      - activity
-      - lunchroom
+      - 90_mins
+      - 3_hours
+      - 4_hours
       type: string
       description: |-
-        * `private_sauna` - Private Sauna
-        * `shared_sauna` - Shared Sauna
-        * `arrangement` - Arrangement
-        * `activity` - Activity
-        * `lunchroom` - Lunchroom
+        * `90_mins` - 90 Minutes
+        * `3_hours` - 3 Hours
+        * `4_hours` - 4 Hours
     TokenObtainPair:
       type: object
       properties:
@@ -2272,6 +1296,22 @@ components:
           minLength: 1
       required:
       - refresh
+    TypeEnum:
+      enum:
+      - sauna
+      - activity
+      - saltroom
+      - package
+      - event
+      - lunchroom
+      type: string
+      description: |-
+        * `sauna` - Sauna
+        * `activity` - Activity
+        * `saltroom` - Saltroom
+        * `package` - Package
+        * `event` - Event
+        * `lunchroom` - Lunchroom
     UserProfile:
       type: object
       properties:

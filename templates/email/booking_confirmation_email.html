@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Confirmation</title>
+</head>
+<body style="margin: 0; padding: 24px 16px; background-color: #ffffff; color: #111111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.6;">
+
+    <div style="max-width: 540px; margin: 0 auto; background-color: #ffffff;">
+        <h2 style="font-size: 20px; font-weight: 600; margin: 0 0 16px 0; color: #000000; border-bottom: 1px solid #e5e5e5; padding-bottom: 12px;">
+            Booking Confirmed
+        </h2>
+
+        <p style="margin: 0 0 20px 0;">
+            Hi {{ booking.name }},
+        </p>
+
+        <p style="margin: 0 0 20px 0;">
+            Thank you for your booking. Your payment has been received and your reservation is confirmed. Here are the details:
+        </p>
+
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555; width: 40%;">Booking ID:</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; font-weight: 600; color: #000000;">{{ booking.booking_id }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Type:</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ booking.get_sauna_type_display|default:booking.sauna_type|title }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Date:</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ booking.booking_date }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Time:</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ booking.booking_time }} ({{ booking.get_time_slot_display|default:booking.time_slot }})</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Guests:</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ booking.capacity }}</td>
+            </tr>
+            {% if booking.get_feature_names %}
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Add-ons:</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">
+                    {% for f in booking.get_feature_names %}
+                        {{ f }}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </td>
+            </tr>
+            {% endif %}
+            <tr>
+                <td style="padding: 10px 0; border-bottom: 2px solid #111111; font-weight: 600; color: #000000;">Total Paid:</td>
+                <td style="padding: 10px 0; border-bottom: 2px solid #111111; font-weight: 600; color: #000000;">€{{ booking.total_price }}</td>
+            </tr>
+        </table>
+
+        <p style="margin: 0 0 24px 0; color: #444444; font-size: 14px;">
+            Please arrive 10-15 minutes prior to your scheduled time. If you have any questions or need to make changes, please contact us.
+        </p>
+
+        <p style="margin: 0; color: #666666; font-size: 13px; border-top: 1px solid #e5e5e5; padding-top: 14px;">
+            Haven Wellness<br>
+            support@havenwellness.com
+        </p>
+    </div>
+
+</body>
+</html>

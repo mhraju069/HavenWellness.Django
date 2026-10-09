@@ -1,8 +1,7 @@
 from django.urls import path
-from .views import *
+from .views import SaunaBookingAPIView
 
 urlpatterns = [
-    # path('', BookingAPIView.as_view()),
-    # path('slots/', TimeSlotAPIView.as_view()),
-    # path('available-slots/', GetAvailableSlotsAPIView.as_view(), name='available-slots'),
-]       
+    path('sauna/', SaunaBookingAPIView.as_view(), name='sauna-booking'),
+    path('sauna/confirm/', SaunaBookingAPIView.as_view(), name='sauna-booking-confirm'),
+]

@@ -1,150 +1,108 @@
-# from django.db import models
-# from datetime import timedelta, time, datetime
-# from django.utils import timezone
-# import random,string,ast
-# from django.conf import settings
-# User = settings.AUTH_USER_MODEL
+from django.db import models
+from django.conf import settings
 
-# # Create your models here.
-
-# class BookingSettings(models.Model):
-#     open_time = models.TimeField(default=time(6, 0))
-#     close_time = models.TimeField(default=time(18, 0))
-#     cancel_before = models.DurationField(default=timedelta(hours=24))
-#     advance_before = models.DurationField(default=timedelta(days=30))
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     updated_at = models.DateTimeField(auto_now=True)
-    
-#     def __str__(self):
-#         return "Booking Settings"
+User = settings.AUTH_USER_MODEL
 
 
-# class Slot(models.Model):
-#     max_capacity = models.IntegerField(default=1)
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     updated_at = models.DateTimeField(auto_now=True)
+class SaunaBooking(models.Model):
+    SAUNA_TYPES = (
+        ('shared', 'Shared Sauna'),
+        ('private', 'Private Sauna'),
+    )
 
-#     def __str__(self):
-#         return f"{self.service.title} | {self.max_capacity}"
+    TIME_SLOTS = (
+        ('90_mins', '90 Minutes'),
+        ('3_hours', '3 Hours'),
+        ('4_hours', '4 Hours'),
+    )
 
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('cancelled', 'Cancelled'),
+    )
 
-# class TimeSlot(models.Model):
-#     TIMES = [
-#         ('6.00 AM', '6.00 AM'),
-#         ('7.00 AM', '7.00 AM'),
-#         ('8.00 AM', '8.00 AM'),
-#         ('9.00 AM', '9.00 AM'),
-#         ('10.00 AM', '10.00 AM'),
-#         ('11.00 AM', '11.00 AM'),
-#         ('12.00 PM', '12.00 PM'),
-#         ('1.00 PM', '1.00 PM'),
-#         ('2.00 PM', '2.00 PM'),
-#         ('3.00 PM', '3.00 PM'),
-#         ('4.00 PM', '4.00 PM'),
-#         ('5.00 PM', '5.00 PM'),
-#         ('6.00 PM', '6.00 PM'),
-#     ]
+    PAYMENT_STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('paid', 'Paid'),
+    )
 
-#     @staticmethod
-#     def generate_slots(open_time, close_time, duration_minutes):
-#         slots = []
-#         # Use a dummy date for calculation
-#         dummy_date = datetime.now().date()
-#         current_dt = datetime.combine(dummy_date, open_time)
-#         end_dt = datetime.combine(dummy_date, close_time)
+    booking_id = models.CharField(max_length=100, editable=False, db_index=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='sauna_bookings')
 
-#         while current_dt + timedelta(minutes=duration_minutes) <= end_dt:
-#             # Format time as '6.00 AM'
-#             time_str = current_dt.strftime("%I.%M %p").lstrip('0')
-#             # Save as tuple string to maintain compatibility with existing ast.literal_eval logic
-#             slot_value = f"('{time_str}', '{time_str}')"
-#             slots.append(slot_value)
-#             current_dt += timedelta(minutes=duration_minutes)
-#         return slots
-    
-#     slot = models.ForeignKey(Slot, on_delete=models.CASCADE)
-#     time = models.CharField(max_length=100) # Increased max_length and removed static choices for dynamic slots
-#     date = models.DateField()
-#     booked_capacity = models.IntegerField(default=0)
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     updated_at = models.DateTimeField(auto_now=True)
+    # Sauna details
+    sauna_type = models.CharField(max_length=20, choices=SAUNA_TYPES, default='shared')
+    booking_date = models.DateField()
+    booking_time = models.TimeField()
+    time_slot = models.CharField(max_length=20, choices=TIME_SLOTS, default='3_hours', help_text="3 Hours or 4 Hours slot")
+    capacity = models.PositiveIntegerField(default=1, help_text="Capacity / guest count")
 
-#     def __str__(self):
-#         return f"{self.slot.service.title} | {self.date} | {self.time}"
+    # Guest details (Must be required)
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20)
 
-#     def available_capacity(self):
-#         return self.slot.max_capacity - self.booked_capacity
+    # Special request / comment (Nullable)
+    special_request = models.TextField(null=True, blank=True)
 
-#     def get_time_display(self):
-#         try:
-#             time_val = ast.literal_eval(self.time)
-#             if isinstance(time_val, (list, tuple)):
-#                 return time_val[0]
-#             return str(time_val)
-#         except (ValueError, SyntaxError):
-#             return self.time
+    # Extra features selected
+    selected_features = models.JSONField(default=list, blank=True, null=True, help_text="List of selected extra features")
 
+    # Price & status
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
 
-# class Booking(models.Model):
-#     Status = [("confirmed", "Confirmed"), ("cancelled", "Cancelled")]
-#     PaymentStatus = [("pending", "Pending"), ("paid", "Paid"), ("on_site", "On Site")]
-    
-#     name = models.CharField(max_length=100,blank=True, null=True)
-#     phone = models.CharField(max_length=15,blank=True, null=True)
-#     email = models.EmailField(blank=True, null=True)
-#     note = models.TextField(blank=True, null=True)
-    
-#     time_slot = models.ForeignKey(TimeSlot, on_delete=models.CASCADE)
-#     booking_id = models.CharField(max_length=100,editable=False,db_index=True)
-#     user = models.ForeignKey(User, on_delete=models.CASCADE)
-#     guests_count = models.IntegerField(default=1)
-#     status = models.CharField(max_length=20, choices=Status, default='pending')
-#     payment_status = models.CharField(max_length=20, choices=PaymentStatus, default='pending')
-#     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
-#     def __str__(self):
-#         return f"{self.service.title} | {self.time_slot.date} | {self.time_slot.time} | {self.status} "
+    def __str__(self):
+        return f"{self.booking_id} | {self.sauna_type} | {self.name} | {self.booking_date}"
 
-#     def save(self, *args, **kwargs):
+    def get_feature_names(self):
+        """
+        Returns list of human-readable feature titles/names.
+        Handles both strings, IDs, and dicts stored in selected_features.
+        """
+        if not self.selected_features:
+            return []
 
-#         if not self.name:
-#             self.name = self.user.name or None
-#         if not self.email:
-#             self.email = self.user.email or None
-        
-#         if not self.id:
-#             super().save(*args, **kwargs)
+        from services.models import PrivateSaunaFeatures, SharedSaunaFeatures
 
-#         if not self.booking_id:
-#             self.booking_id = f"BK-{self.id:03d}"
-#             super().save(update_fields=['booking_id'])
-          
+        names = []
+        for item in self.selected_features:
+            if isinstance(item, dict):
+                names.append(item.get('feature') or item.get('name') or str(item))
+            elif isinstance(item, int) or (isinstance(item, str) and item.isdigit()):
+                feat_id = int(item)
+                # Check private features first, then shared features
+                feat = (
+                    PrivateSaunaFeatures.objects.filter(id=feat_id).first()
+                    or SharedSaunaFeatures.objects.filter(id=feat_id).first()
+                )
+                if feat and feat.feature:
+                    names.append(feat.feature)
+                elif feat:
+                    names.append(getattr(feat, 'feature_en', None) or f"Add-on #{feat_id}")
+                else:
+                    names.append(f"Add-on #{feat_id}")
+            else:
+                names.append(str(item))
+        return names
 
-# class AccessCode(models.Model):
-#     booking = models.OneToOneField(Booking, on_delete=models.CASCADE,related_name="access_code")
-#     code = models.CharField(max_length=100, editable=False,unique=True,db_index=True)
-#     valid_from = models.DateTimeField(default=timezone.now)
-#     valid_until = models.DateTimeField()
-#     is_used = models.BooleanField(default=False)
-#     is_active = models.BooleanField(default=True)
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     updated_at = models.DateTimeField(auto_now=True)
+    def save(self, *args, **kwargs):
+        if self.selected_features:
+            resolved_names = self.get_feature_names()
+            if resolved_names:
+                self.selected_features = resolved_names
 
-#     def __str__(self):
-#         return self.code
-    
-#     def save(self, *args, **kwargs):
-#         if not self.code:
-#             self.code = f"{''.join(random.choices(string.ascii_uppercase, k=3))}-{random.randint(1000, 9999)}"
-#         self.valid_until = self.valid_from + timedelta(minutes=self.booking.service.duration)
-
-#         if self.valid_until > timezone.now():
-#             self.is_active = False
-#         else:
-#             self.is_active = True
-
-#         super().save(*args, **kwargs)
-
-
+        if not self.id:
+            super().save(*args, **kwargs)
+        if not self.booking_id:
+            if self.sauna_type == 'shared':
+                self.booking_id = f"SS-{self.id:04d}"
+            else:
+                self.booking_id = f"PS-{self.id:04d}"
+            super().save(update_fields=['booking_id', 'selected_features'])
+        else:
+            super().save(*args, **kwargs)

@@ -29,3 +29,27 @@ class SessionPassSerializer(serializers.ModelSerializer):
     class Meta:
         model = SessionPass
         exclude = ['created_at', 'updated_at']
+
+
+class PaymentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payments
+        fields = '__all__'
+
+
+class CreatePaymentIntentRequestSerializer(serializers.Serializer):
+    booking_id = serializers.CharField(help_text="Booking identifier, e.g., PS-0001 or SS-0001", required=True)
+    currency = serializers.CharField(default="eur", required=False)
+
+
+class CreatePaymentIntentResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    client_secret = serializers.CharField()
+    payment_intent_id = serializers.CharField()
+    booking_id = serializers.CharField()
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    currency = serializers.CharField()
+
+
+class PaymentMessageResponseSerializer(serializers.Serializer):
+    message = serializers.CharField()

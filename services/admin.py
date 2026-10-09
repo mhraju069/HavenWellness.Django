@@ -25,3 +25,7 @@ admin.site.register(SaltroomFeatures, BaseTranslationAdmin)
 
 admin.site.register(Packages, BaseTranslationAdmin)
 admin.site.register(PackageFeatures, BaseTranslationAdmin)
+
+admin.site.register(ServiceSettings, ModelAdmin)
+admin.site.register(BlockDate, ModelAdmin)
+admin.site.register(SpecialOpeningDate, ModelAdmin)
