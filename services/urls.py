@@ -6,4 +6,5 @@ urlpatterns = [
     path('sauna/', SaunaServiceView.as_view()),
     path('activities/', ActivitiesView.as_view()),
     path('saltroom/', SaltroomServiceView.as_view()),
+    path('packages/', PackagesView.as_view()),
 ]

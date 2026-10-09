@@ -4,10 +4,14 @@ from .models import *
 from payments.serializers import SessionPassSerializer, SubscriptionPlansSerializer 
 
 
-class SaunaSessionSerializer(serializers.ModelSerializer):
+class ServicesSerializer(serializers.ModelSerializer):
     class Meta:
-        model = SaunaSeesion
+        model = Services
         exclude = ['created_at', 'updated_at']
+
+
+
+#Activity services
 
 class ActivitiesSerializer(serializers.ModelSerializer):
     class Meta:
@@ -21,19 +25,17 @@ class ActivitiesFeatureSerializer(serializers.ModelSerializer):
         fields = ['id', 'feature']
 
 
-class ActivitySessionSerializer(serializers.ModelSerializer):
-    features = ActivitiesFeatureSerializer(many=True, read_only=True)
 
-    class Meta:
-        model = ActivitySession
-        exclude = ['created_at', 'updated_at']
-
+#Lunchroom services
 
 class LunchroomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lunchroom
         exclude = ['created_at', 'updated_at']
 
+
+
+#Saltroom services
 
 class SaltroomFeaturesSerializer(serializers.ModelSerializer):
     class Meta:
@@ -47,14 +49,6 @@ class SaltroomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Saltroom
         exclude = ['created_at', 'updated_at']
-
-
-class AllServicesSerializer(serializers.Serializer):
-    sauna_seesion = SaunaSessionSerializer(many=True, required=False)
-    activity_session = ActivitiesSerializer(many=True, required=False)
-    lunchroom = LunchroomSerializer(many=True, required=False)
-    saltroom = SaltroomSerializer(many=True, required=False)
-
 
 
 
@@ -95,3 +89,17 @@ class SaltroomServiceSerializer(serializers.Serializer):
     saltroom = SaltroomSerializer(many=True, required=False)
     subscription_plans = SubscriptionPlansSerializer(many=True, required=False)
     session_pass = SessionPassSerializer(many=True, required=False)
+
+
+#Package Services
+
+class PackageFeaturesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PackageFeatures
+        fields = ['id', 'feature']
+
+class PackagesSerializer(serializers.ModelSerializer):
+    features = PackageFeaturesSerializer(many=True, read_only=True)
+    class Meta:
+        model = Packages
+        exclude = ['created_at', 'updated_at']

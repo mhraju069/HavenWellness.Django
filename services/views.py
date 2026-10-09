@@ -17,21 +17,17 @@ class AllServicesView(APIView):
     @extend_schema(
         tags=["Services"],
         summary="List all Services",
-        responses={200: AllServicesSerializer},
+        parameters=[
+            OpenApiParameter(name="type", description="Filter by service type (sauna, activity, saltroom, package, event, lunchroom)", required=False, type=str),
+        ],
+        responses={200: ServicesSerializer(many=True)},
     )
     def get(self, request):
-        sauna_seesion = SaunaSeesion.objects.all()
-        activity_session = Activities.objects.all()
-        lunchroom = Lunchroom.objects.all()
-        saltroom = Saltroom.objects.all()
-
-        serializer = AllServicesSerializer({
-            "sauna_seesion": sauna_seesion,
-            "activity_session": activity_session,
-            "lunchroom": lunchroom,
-            "saltroom": saltroom,
-        }, context={'request': request})
-
+        service_type = request.query_params.get('type')
+        data = Services.objects.all().order_by('-created_at')
+        if service_type:
+            data = data.filter(type=service_type)
+        serializer = ServicesSerializer(data, many=True, context={'request': request})
         return Response({
             "success": True,
             "data": serializer.data,
@@ -54,7 +50,7 @@ class SaunaServiceView(APIView):
         serializer = SaunaServiceSerializer({
             "private_sauna": private_sauna,
             "shared_sauna": shared_sauna,
-        })
+        }, context={'request': request})
 
         return Response({
             "success": True,
@@ -69,11 +65,11 @@ class ActivitiesView(APIView):
     @extend_schema(
         tags=["Services"],
         summary="List Activity Sessions",
-        responses={200: ActivitySessionSerializer(many=True)},
+        responses={200: ActivitiesSerializer(many=True)},
     )
     def get(self, request):
-        activity_sessions = ActivitySession.objects.prefetch_related('features').all()
-        serializer = ActivitySessionSerializer(activity_sessions, many=True, context={'request': request})
+        activities = Activities.objects.prefetch_related('features').all()
+        serializer = ActivitiesSerializer(activities, many=True, context={'request': request})
         return Response({
             "success": True,
             "data": serializer.data,
@@ -105,6 +101,38 @@ class SaltroomServiceView(APIView):
             "data": serializer.data,
             "message": "Saltroom Service List",
         })
+
+
+
+class PackagesView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Services"],
+        summary="List Packages",
+        responses={200: PackagesSerializer(many=True)},
+    )
+    def get(self, request):
+        package = Packages.objects.prefetch_related('features').all()
+        serializer = PackagesSerializer(package, many=True, context={'request': request})
+        return Response({
+            "success": True,
+            "data": serializer.data,
+            "message": "Package List",
+        })
+
+
+        
+
+
+
+
+
+
+
+
+
+
 
 # @extend_schema(
 #     tags=['Services'],

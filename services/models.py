@@ -2,16 +2,27 @@ from django.core.files import images
 from django.db import models
 
 # Create your models here.
-class SaunaSeesion(models.Model):
+class Services(models.Model):
+    SERVICE_TYPES = [
+        ('sauna', 'Sauna'),
+        ('activity', 'Activity'),
+        ('saltroom', 'Saltroom'),
+        ('package', 'Package'),
+        ('event', 'Event'),
+        ('lunchroom', 'Lunchroom'),
+    ]
     title = models.CharField(max_length=100)
     subtitle = models.CharField(max_length=100, default="")
     description = models.TextField()
-    images = models.ImageField(upload_to="sauna_seesion", null=True, blank=True)
+    type = models.CharField(max_length=100, choices=SERVICE_TYPES)
+    image = models.ImageField(upload_to="services", null=True, blank=True)  
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.title
+
+
 
 
 class PrivateSauna(models.Model):
@@ -38,6 +49,8 @@ class PrivateSaunaFeatures(models.Model):
         return f"Feature for {self.feature}"
 
 
+
+
 class SharedSauna(models.Model):
     price_per_person = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_available = models.BooleanField(default=True)
@@ -47,6 +60,7 @@ class SharedSauna(models.Model):
 
     def __str__(self):
         return f"{self.price_per_person}"
+
 
 class SharedSaunaFeatures(models.Model):
     sauna = models.ForeignKey(SharedSauna, on_delete=models.CASCADE, related_name='features')
@@ -58,19 +72,10 @@ class SharedSaunaFeatures(models.Model):
     def __str__(self):
         return f"Feature for {self.feature}"
 
+
+
+
 class Activities(models.Model):
-    title = models.CharField(max_length=100)
-    subtitle = models.CharField(max_length=100, default="")
-    description = models.TextField()
-    images = models.ImageField(upload_to="activity", null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return self.title
-
-
-class ActivitySession(models.Model):
     title = models.CharField(max_length=100)
     description = models.TextField()
     images = models.ImageField(upload_to="activity_session", null=True, blank=True)
@@ -83,11 +88,12 @@ class ActivitySession(models.Model):
 
 
 class ActivitiesFeature(models.Model):
-    activity = models.ForeignKey(ActivitySession, on_delete=models.CASCADE, related_name='features')
+    activity = models.ForeignKey(Activities, on_delete=models.CASCADE, related_name='features')
     feature = models.CharField(max_length=100)
 
     def __str__(self):
         return f"{self.feature}"
+
 
 
 
@@ -101,6 +107,7 @@ class Lunchroom(models.Model):
 
     def __str__(self):
         return f"{self.title}"
+
 
 
 
@@ -128,6 +135,26 @@ class SaltroomFeatures(models.Model):
 
 
 
+
+class Packages(models.Model):
+    title = models.CharField(max_length=100)
+    packages = models.CharField(max_length=100)
+    description = models.TextField()
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    image = models.ImageField(upload_to="package", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f" {self.title} | {self.price}"
+
+
+class PackageFeatures(models.Model):
+    package = models.ForeignKey(Packages, on_delete=models.CASCADE, related_name='features')
+    feature = models.CharField(max_length=100)
+
+    def __str__(self):
+        return f" {self.package.title} | {self.feature}"
 
 
 
