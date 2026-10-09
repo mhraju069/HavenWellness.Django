@@ -90,15 +90,15 @@ class SaltroomServiceView(APIView):
         responses={200: SaltroomServiceSerializer},
     )
     def get(self, request):
-        saltroom = Saltroom.objects.all()
-        subscription_plans = SubscriptionPlans.objects.prefetch_related('features').all()
+        saltroom = Saltroom.objects.prefetch_related('features').all()
+        subscription_plans = SubscriptionPlans.objects.prefetch_related('features').filter(plan_category='saltroom')
         session_pass = SessionPass.objects.prefetch_related('features').all()
 
         serializer = SaltroomServiceSerializer({
             "saltroom": saltroom,
             "subscription_plans": subscription_plans,
             "session_pass": session_pass,
-        })
+        }, context={'request': request})
 
         return Response({
             "success": True,

@@ -117,6 +117,16 @@ class Saltroom(models.Model):
         return f"{self.title}"
 
 
+class SaltroomFeatures(models.Model):
+    saltroom = models.ForeignKey(Saltroom, on_delete=models.CASCADE, related_name='features')
+    feature = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Feature for {self.feature}"
+
+
 
 
 

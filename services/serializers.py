@@ -35,7 +35,15 @@ class LunchroomSerializer(serializers.ModelSerializer):
         exclude = ['created_at', 'updated_at']
 
 
+class SaltroomFeaturesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SaltroomFeatures
+        exclude = ['saltroom', 'created_at', 'updated_at']
+
+
 class SaltroomSerializer(serializers.ModelSerializer):
+    features = SaltroomFeaturesSerializer(many=True, read_only=True)
+
     class Meta:
         model = Saltroom
         exclude = ['created_at', 'updated_at']
