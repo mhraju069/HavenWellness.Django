@@ -95,11 +95,20 @@ def send_booking_confirmation_email(booking):
             booking_date_display = str(booking.booking_date)
             booking_time_display = str(booking.booking_time)
             time_slot_display = booking.get_time_slot_display() if hasattr(booking, 'get_time_slot_display') else str(getattr(booking, 'time_slot', ''))
+        elif hasattr(booking, 'guests') and hasattr(booking, 'start_time'):
+            booking_type_display = 'Event Booking'
+            booking_date_display = str(booking.date)
+            booking_time_display = f"{booking.start_time} - {booking.end_time}"
+            time_slot_display = ""
         else:
             booking_type_display = 'Lunchroom'
             booking_date_display = str(getattr(booking, 'booking_date', ''))
             booking_time_display = str(getattr(booking, 'booking_time', ''))
             time_slot_display = ""
+
+        guests_count_display = getattr(booking, 'guests', None) or getattr(booking, 'capacity', 1)
+
+        is_paid_booking = hasattr(booking, 'total_price') and float(getattr(booking, 'total_price', 0)) > 0
 
         context = {
             'booking': booking,
@@ -107,6 +116,8 @@ def send_booking_confirmation_email(booking):
             'booking_date_display': booking_date_display,
             'booking_time_display': booking_time_display,
             'time_slot_display': time_slot_display,
+            'guests_count_display': guests_count_display,
+            'is_paid_booking': is_paid_booking,
         }
 
         html_message = render_to_string('email/booking_confirmation_email.html', context)

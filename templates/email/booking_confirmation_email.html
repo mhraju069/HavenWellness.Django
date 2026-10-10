@@ -17,7 +17,11 @@
         </p>
 
         <p style="margin: 0 0 20px 0;">
+            {% if is_paid_booking %}
             Thank you for your booking. Your payment has been received and your reservation is confirmed. Here are the details:
+            {% else %}
+            Thank you for your booking. Your reservation has been received and confirmed. Here are the details:
+            {% endif %}
         </p>
 
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
@@ -39,7 +43,7 @@
             </tr>
             <tr>
                 <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Guests:</td>
-                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ booking.capacity }}</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ guests_count_display }}</td>
             </tr>
             {% if booking.get_feature_names %}
             <tr>

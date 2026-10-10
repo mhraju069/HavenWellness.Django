@@ -195,3 +195,37 @@ class ActivityBooking(models.Model):
             super().save(update_fields=['booking_id'])
         else:
             super().save(*args, **kwargs)
+
+
+class EventBooking(models.Model):
+    booking_id = models.CharField(max_length=100, editable=False, db_index=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='event_bookings')
+    date = models.DateField(help_text="Event Date")
+    start_time = models.TimeField(help_text="Event Start Time")
+    end_time = models.TimeField(help_text="Event End Time")
+    guests = models.PositiveIntegerField(default=1, help_text="Number of guests")
+
+    food_preference = models.TextField(null=True, blank=True, help_text="Food preference")
+    drink_preference = models.TextField(null=True, blank=True, help_text="Drink preference")
+    music_preference = models.TextField(null=True, blank=True, help_text="Music preference")
+    notes = models.TextField(null=True, blank=True)
+
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+    def __str__(self):
+        return f"{self.booking_id} | {self.name} | {self.date}"
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            super().save(*args, **kwargs)
+        if not self.booking_id:
+            self.booking_id = f"EVNT-{self.id:04d}"
+            super().save(update_fields=['booking_id'])
+        else:
+            super().save(*args, **kwargs)

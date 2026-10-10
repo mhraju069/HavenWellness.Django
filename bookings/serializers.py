@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import SaunaBooking, LunchroomBooking, ActivityBooking
+from .models import SaunaBooking, LunchroomBooking, ActivityBooking, EventBooking
 
 
 class SaunaBookingSerializer(serializers.ModelSerializer):
@@ -112,6 +112,32 @@ class ActivityBookingSerializer(serializers.ModelSerializer):
         if (not total_price or float(total_price) == 0) and activity and activity.price:
             validated_data['total_price'] = activity.price * capacity
 
+        return super().create(validated_data)
+
+
+class EventBookingSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(required=True, help_text="Guest Name (Required)")
+    email = serializers.EmailField(required=True, help_text="Guest Email (Required)")
+    phone = serializers.CharField(required=True, help_text="Guest Phone Number (Required)")
+    date = serializers.DateField(required=True, help_text="Event Date (YYYY-MM-DD)")
+    start_time = serializers.TimeField(required=True, help_text="Event Start Time (HH:MM:SS)")
+    end_time = serializers.TimeField(required=True, help_text="Event End Time (HH:MM:SS)")
+    guests = serializers.IntegerField(required=True, help_text="Number of guests")
+
+    food_preference = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    drink_preference = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    music_preference = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+
+    class Meta:
+        model = EventBooking
+        fields = '__all__'
+        read_only_fields = ['id', 'booking_id', 'user', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            validated_data['user'] = request.user
         return super().create(validated_data)
 
 
