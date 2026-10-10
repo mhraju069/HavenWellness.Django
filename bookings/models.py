@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from services.models import Activities
 
 User = settings.AUTH_USER_MODEL
 
@@ -151,4 +152,46 @@ class LunchroomBooking(models.Model):
         else:
             super().save(*args, **kwargs)
 
+
+class ActivityBooking(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('cancelled', 'Cancelled'),
+    )
+
+    PAYMENT_STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('paid', 'Paid'),
+    )
+
+    booking_id = models.CharField(max_length=100, editable=False, db_index=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='activity_bookings')
+    activity = models.ForeignKey(Activities, on_delete=models.CASCADE, related_name='activity_bookings')
+    capacity = models.PositiveIntegerField(default=1, help_text="Capacity / guest count")
     
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20)
+    special_request = models.TextField(null=True, blank=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='confirmed')
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+    def __str__(self):
+        activity_title = self.activity.title if self.activity else "Activity"
+        return f"{self.booking_id} | {self.name} | {activity_title}"
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            super().save(*args, **kwargs)
+        if not self.booking_id:
+            self.booking_id = f"ACT-{self.id:04d}"
+            super().save(update_fields=['booking_id'])
+        else:
+            super().save(*args, **kwargs)

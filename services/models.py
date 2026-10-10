@@ -80,8 +80,15 @@ class SharedSaunaFeatures(models.Model):
 class Activities(models.Model):
     title = models.CharField(max_length=100)
     description = models.TextField()
+    date = models.DateField(null=True, blank=True)
+    open_time = models.TimeField(null=True, blank=True)
+    close_time = models.TimeField(null=True, blank=True)
+    capacity = models.PositiveIntegerField(default=1)
+    host = models.CharField(max_length=100, default="")
+    additional_notes = models.TextField(null=True, blank=True)
     images = models.ImageField(upload_to="activity_session", null=True, blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    is_available = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

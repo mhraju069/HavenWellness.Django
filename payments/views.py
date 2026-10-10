@@ -12,7 +12,7 @@ from djstripe.models import PaymentIntent, Customer, Subscription, Event
 
 from .helper import send_booking_confirmation_email
 from .models import Payments
-from bookings.models import SaunaBooking
+from bookings.models import SaunaBooking, ActivityBooking
 from .serializers import (
     PaymentsSerializer,
     CreatePaymentIntentRequestSerializer,
@@ -28,9 +28,15 @@ def create_payment_intent_for_booking(booking, currency="eur"):
         return None, None, None
 
     # Detect booking type
-    is_lunchroom = hasattr(booking, 'celebration_type') or booking.booking_id.startswith('LR-')
-    booking_type_val = 'lunchroom' if is_lunchroom else 'sauna'
-    booking_label = 'Lunchroom' if is_lunchroom else 'Sauna'
+    if hasattr(booking, 'activity') or booking.booking_id.startswith('ACT-'):
+        booking_type_val = 'activities'
+        booking_label = 'Activity'
+    elif hasattr(booking, 'celebration_type') or booking.booking_id.startswith('LR-'):
+        booking_type_val = 'lunchroom'
+        booking_label = 'Lunchroom'
+    else:
+        booking_type_val = 'sauna'
+        booking_label = 'Sauna'
 
     djstripe_customer = None
     if booking.user:
@@ -53,7 +59,11 @@ def create_payment_intent_for_booking(booking, currency="eur"):
         'customer_email': booking.email,
         'customer_name': booking.name,
     }
-    if is_lunchroom:
+    if booking_type_val == 'activities':
+        metadata['activity_booking_id'] = str(booking.id)
+        if hasattr(booking, 'activity') and booking.activity:
+            metadata['activity_title'] = booking.activity.title
+    elif booking_type_val == 'lunchroom':
         metadata['lunchroom_booking_id'] = str(booking.id)
     else:
         metadata['sauna_booking_id'] = str(booking.id)
@@ -122,8 +132,10 @@ class CreatePaymentIntentAPIView(APIView):
         currency = serializer.validated_data.get('currency', 'eur')
 
         booking = SaunaBooking.objects.filter(booking_id=booking_id_input).first()
+        if not booking:
+            booking = ActivityBooking.objects.filter(booking_id=booking_id_input).first()
         if not booking and booking_id_input.isdigit():
-            booking = SaunaBooking.objects.filter(id=int(booking_id_input)).first()
+            booking = SaunaBooking.objects.filter(id=int(booking_id_input)).first() or ActivityBooking.objects.filter(id=int(booking_id_input)).first()
 
         if not booking:
             return Response({"error": f"Booking with ID '{booking_id_input}' not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -213,7 +225,10 @@ class StripeWebhookView(APIView):
 
             target_booking_id = booking_id or (payment.booking_id if payment else None)
             if target_booking_id:
-                booking_obj = SaunaBooking.objects.filter(booking_id=target_booking_id).first()
+                booking_obj = (
+                    SaunaBooking.objects.filter(booking_id=target_booking_id).first()
+                    or ActivityBooking.objects.filter(booking_id=target_booking_id).first()
+                )
                 if booking_obj:
                     booking_obj.payment_status = 'paid'
                     booking_obj.status = 'confirmed'
@@ -251,7 +266,10 @@ def handle_djstripe_payment_succeeded(event, **kwargs):
 
     target_booking_id = booking_id or (payment.booking_id if payment else None)
     if target_booking_id:
-        booking_obj = SaunaBooking.objects.filter(booking_id=target_booking_id).first()
+        booking_obj = (
+            SaunaBooking.objects.filter(booking_id=target_booking_id).first()
+            or ActivityBooking.objects.filter(booking_id=target_booking_id).first()
+        )
         if booking_obj:
             booking_obj.payment_status = 'paid'
             booking_obj.status = 'confirmed'

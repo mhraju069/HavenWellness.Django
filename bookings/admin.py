@@ -1,6 +1,6 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
-from .models import SaunaBooking, LunchroomBooking
+from .models import SaunaBooking, LunchroomBooking, ActivityBooking
 
 
 @admin.register(SaunaBooking)
@@ -15,3 +15,10 @@ class LunchroomBookingAdmin(ModelAdmin):
     list_display = ['booking_id', 'name', 'email', 'phone', 'booking_date', 'booking_time', 'capacity', 'status']
     list_filter = ['status', 'booking_date']
     search_fields = ['booking_id', 'name', 'email', 'phone', 'name_of_celebrant']
+
+
+@admin.register(ActivityBooking)
+class ActivityBookingAdmin(ModelAdmin):
+    list_display = ['booking_id', 'name', 'email', 'phone', 'activity', 'capacity', 'total_price', 'status', 'payment_status', 'created_at']
+    list_filter = ['status', 'payment_status', 'activity']
+    search_fields = ['booking_id', 'name', 'email', 'phone', 'activity__title']

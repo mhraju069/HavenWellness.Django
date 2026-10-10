@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import SaunaBooking, LunchroomBooking
+from .models import SaunaBooking, LunchroomBooking, ActivityBooking
 
 
 class SaunaBookingSerializer(serializers.ModelSerializer):
@@ -73,4 +73,45 @@ class LunchroomBookingSerializer(serializers.ModelSerializer):
         if request and request.user and request.user.is_authenticated:
             validated_data['user'] = request.user
         return super().create(validated_data)
+
+
+class ActivityBookingSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(required=True, help_text="Guest Name (Required)")
+    email = serializers.EmailField(required=True, help_text="Guest Email (Required)")
+    phone = serializers.CharField(required=True, help_text="Guest Phone Number (Required)")
+    special_request = serializers.CharField(required=False, allow_null=True, allow_blank=True, help_text="Special Request or Comment (Optional)")
+
+    class Meta:
+        model = ActivityBooking
+        fields = '__all__'
+        read_only_fields = ['id', 'booking_id', 'user', 'created_at', 'updated_at']
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        if instance.activity:
+            rep['activity_details'] = {
+                'id': instance.activity.id,
+                'title': instance.activity.title,
+                'date': str(instance.activity.date) if instance.activity.date else None,
+                'open_time': str(instance.activity.open_time) if instance.activity.open_time else None,
+                'close_time': str(instance.activity.close_time) if instance.activity.close_time else None,
+                'price': str(instance.activity.price),
+                'host': instance.activity.host,
+            }
+        return rep
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            validated_data['user'] = request.user
+
+        # Auto calculate total_price if zero or not provided: activity.price * capacity
+        activity = validated_data.get('activity')
+        capacity = validated_data.get('capacity', 1)
+        total_price = validated_data.get('total_price', 0)
+        if (not total_price or float(total_price) == 0) and activity and activity.price:
+            validated_data['total_price'] = activity.price * capacity
+
+        return super().create(validated_data)
+
 

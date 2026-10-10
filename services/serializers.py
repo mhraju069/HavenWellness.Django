@@ -20,10 +20,29 @@ class ActivitiesFeatureSerializer(serializers.ModelSerializer):
 
 class ActivitiesSerializer(serializers.ModelSerializer):
     features = ActivitiesFeatureSerializer(many=True, read_only=True)
+    available_slots = serializers.SerializerMethodField()
+    booked_slots = serializers.SerializerMethodField()
 
     class Meta:
         model = Activities
         exclude = ['created_at', 'updated_at']
+
+    def get_booked_slots(self, obj):
+        from bookings.models import ActivityBooking
+        from django.db.models import Sum
+
+        total_booked = ActivityBooking.objects.filter(
+            activity=obj
+        ).exclude(
+            status='cancelled'
+        ).aggregate(total=Sum('capacity'))['total'] or 0
+
+        return total_booked
+
+    def get_available_slots(self, obj):
+        booked = self.get_booked_slots(obj)
+        total_capacity = obj.capacity or 0
+        return max(0, total_capacity - booked)
 
 
 #Lunchroom services

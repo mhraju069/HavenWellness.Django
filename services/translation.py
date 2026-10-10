@@ -27,7 +27,7 @@ class SharedSaunaFeaturesTranslationOptions(TranslationOptions):
 
 @register(Activities)
 class ActivitiesTranslationOptions(TranslationOptions):
-    fields = ('title', 'description')
+    fields = ('title', 'description', 'additional_notes')
 
 @register(ActivitiesFeature)
 class ActivitiesFeatureTranslationOptions(TranslationOptions):

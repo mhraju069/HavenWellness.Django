@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, time
+from django.utils import timezone
 from .models import *
 from payments.models import SubscriptionPlans, SessionPass
 from bookings.models import SaunaBooking
@@ -78,7 +79,10 @@ class ServiceDetailView(APIView):
             })
 
         elif s_type in ['activity', 'activities']:
-            activities = Activities.objects.prefetch_related('features').all()
+            today = timezone.localdate()
+            activities = Activities.objects.prefetch_related('features').filter(
+                models.Q(date__gte=today) | models.Q(date__isnull=True)
+            ).order_by('date', 'open_time')
             serializer = ActivitiesSerializer(activities, many=True, context={'request': request})
             return Response({
                 "success": True,

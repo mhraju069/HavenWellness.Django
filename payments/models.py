@@ -64,6 +64,7 @@ class Payments(models.Model):
     BOOKING_CATEGORY = (
         ('sauna', 'Sauna'),
         ('saltroom', 'Saltroom'),
+        ('activities', 'Activities'),
     )
 
     booking_id = models.CharField(max_length=100, db_index=True)
