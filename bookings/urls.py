@@ -1,7 +1,9 @@
 from django.urls import path
-from .views import SaunaBookingAPIView
+from .views import SaunaBookingAPIView, LunchroomBookingAPIView
 
 urlpatterns = [
     path('sauna/', SaunaBookingAPIView.as_view(), name='sauna-booking'),
     path('sauna/confirm/', SaunaBookingAPIView.as_view(), name='sauna-booking-confirm'),
+    path('lunchroom/', LunchroomBookingAPIView.as_view(), name='lunchroom-booking'),
+    path('lunchroom/confirm/', LunchroomBookingAPIView.as_view(), name='lunchroom-booking-confirm'),
 ]

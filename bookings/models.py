@@ -106,3 +106,49 @@ class SaunaBooking(models.Model):
             super().save(update_fields=['booking_id', 'selected_features'])
         else:
             super().save(*args, **kwargs)
+
+
+class LunchroomBooking(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('cancelled', 'Cancelled'),
+    )
+    booking_id = models.CharField(max_length=100, editable=False, db_index=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='lunchroom_bookings')
+    booking_date = models.DateField()
+    booking_time = models.TimeField()
+    capacity = models.PositiveIntegerField(default=1, help_text="Capacity / guest count")
+    
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20)
+    special_request = models.TextField(null=True, blank=True)
+
+    #Celebration
+    celebration_type = models.CharField(max_length=20, null=True, blank=True)
+    celebration_date = models.DateField(null=True, blank=True)
+    name_of_celebrant = models.CharField(max_length=100, null=True, blank=True)
+    age_of_celebrant = models.PositiveIntegerField(null=True, blank=True)
+    hobbies = models.CharField(max_length=100, null=True, blank=True)
+    celebration_details = models.TextField(null=True, blank=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='confirmed')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+    def __str__(self):
+        return f"{self.booking_id} | {self.name} | {self.booking_date}"
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            super().save(*args, **kwargs)
+        if not self.booking_id:
+            self.booking_id = f"LR-{self.id:04d}"
+            super().save(update_fields=['booking_id'])
+        else:
+            super().save(*args, **kwargs)
+
+    

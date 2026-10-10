@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import SaunaBooking
+from .models import SaunaBooking, LunchroomBooking
 
 
 class SaunaBookingSerializer(serializers.ModelSerializer):
@@ -49,3 +49,28 @@ class SaunaBookingSerializer(serializers.ModelSerializer):
         if request and request.user and request.user.is_authenticated:
             validated_data['user'] = request.user
         return super().create(validated_data)
+
+
+class LunchroomBookingSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(required=True, help_text="Guest Name (Required)")
+    email = serializers.EmailField(required=True, help_text="Guest Email (Required)")
+    phone = serializers.CharField(required=True, help_text="Guest Phone Number (Required)")
+    special_request = serializers.CharField(required=False, allow_null=True, allow_blank=True, help_text="Special Request or Comment (Optional)")
+    celebration_type = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    celebration_date = serializers.DateField(required=False, allow_null=True)
+    name_of_celebrant = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    age_of_celebrant = serializers.IntegerField(required=False, allow_null=True)
+    hobbies = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    celebration_details = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+
+    class Meta:
+        model = LunchroomBooking
+        fields = '__all__'
+        read_only_fields = ['id', 'booking_id', 'user', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            validated_data['user'] = request.user
+        return super().create(validated_data)
+

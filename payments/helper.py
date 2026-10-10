@@ -85,19 +85,40 @@ def send_booking_confirmation_email(booking):
         email_from = getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None)
         recipient_list = [booking.email]
 
+        booking_type_display = 'Lunchroom'
+        if hasattr(booking, 'get_sauna_type_display'):
+            booking_type_display = booking.get_sauna_type_display()
+        elif hasattr(booking, 'sauna_type'):
+            booking_type_display = str(booking.sauna_type).title()
+
+        time_slot_display = ""
+        if hasattr(booking, 'get_time_slot_display'):
+            time_slot_display = booking.get_time_slot_display()
+        elif hasattr(booking, 'time_slot'):
+            time_slot_display = str(booking.time_slot)
+
         context = {
             'booking': booking,
+            'booking_type_display': booking_type_display,
+            'time_slot_display': time_slot_display,
         }
 
         html_message = render_to_string('email/booking_confirmation_email.html', context)
+
+        time_slot_str = ""
+        if hasattr(booking, 'time_slot'):
+            time_slot_str = f" ({getattr(booking, 'get_time_slot_display', lambda: booking.time_slot)()})"
+
+        total_paid_str = f"\nTotal Paid: €{booking.total_price}" if hasattr(booking, 'total_price') else ""
+
         plain_message = (
             f"Hello {booking.name},\n\n"
             f"Your booking has been confirmed!\n"
             f"Booking ID: {booking.booking_id}\n"
-            f"Type: {booking.sauna_type}\n"
+            f"Type: {booking_type_display}\n"
             f"Date: {booking.booking_date}\n"
-            f"Time: {booking.booking_time}\n"
-            f"Total Paid: €{booking.total_price}\n\n"
+            f"Time: {booking.booking_time}{time_slot_str}"
+            f"{total_paid_str}\n\n"
             f"Thank you for choosing Haven Wellness!"
         )
 

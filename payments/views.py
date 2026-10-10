@@ -27,6 +27,11 @@ def create_payment_intent_for_booking(booking, currency="eur"):
     if amount_cents <= 0:
         return None, None, None
 
+    # Detect booking type
+    is_lunchroom = hasattr(booking, 'celebration_type') or booking.booking_id.startswith('LR-')
+    booking_type_val = 'lunchroom' if is_lunchroom else 'sauna'
+    booking_label = 'Lunchroom' if is_lunchroom else 'Sauna'
+
     djstripe_customer = None
     if booking.user:
         djstripe_customer = Customer.objects.filter(subscriber=booking.user).first()
@@ -42,16 +47,22 @@ def create_payment_intent_for_booking(booking, currency="eur"):
         except Exception as cust_err:
             print("djstripe Customer creation warning:", cust_err)
 
+    metadata = {
+        'booking_id': booking.booking_id,
+        'booking_type': booking_type_val,
+        'customer_email': booking.email,
+        'customer_name': booking.name,
+    }
+    if is_lunchroom:
+        metadata['lunchroom_booking_id'] = str(booking.id)
+    else:
+        metadata['sauna_booking_id'] = str(booking.id)
+
     intent_kwargs = {
         "amount": amount_cents,
         "currency": currency.lower(),
-        "metadata": {
-            'booking_id': booking.booking_id,
-            'sauna_booking_id': str(booking.id),
-            'customer_email': booking.email,
-            'customer_name': booking.name,
-        },
-        "description": f"Payment for Sauna Booking {booking.booking_id}",
+        "metadata": metadata,
+        "description": f"Payment for {booking_label} Booking {booking.booking_id}",
     }
     if djstripe_customer:
         intent_kwargs["customer"] = djstripe_customer.id
@@ -65,7 +76,7 @@ def create_payment_intent_for_booking(booking, currency="eur"):
     payment, created = Payments.objects.get_or_create(
         booking_id=booking.booking_id,
         defaults={
-            'booking_type': 'sauna',
+            'booking_type': booking_type_val,
             'client': booking.user if booking.user else None,
             'amount': booking.total_price,
             'currency': currency.lower(),
@@ -75,7 +86,7 @@ def create_payment_intent_for_booking(booking, currency="eur"):
         }
     )
     if not created:
-        payment.booking_type = 'sauna'
+        payment.booking_type = booking_type_val
         if booking.user:
             payment.client = booking.user
         payment.amount = booking.total_price
