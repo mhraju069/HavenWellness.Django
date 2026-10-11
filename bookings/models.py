@@ -276,3 +276,57 @@ class PackageBooking(models.Model):
             super().save(update_fields=['booking_id'])
         else:
             super().save(*args, **kwargs)
+
+
+class SaltRoomBooking(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('cancelled', 'Cancelled'),
+    )
+    PAYMENT_STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('paid', 'Paid'),
+    )
+
+    booking_id = models.CharField(max_length=100, editable=False, db_index=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='saltroom_bookings')
+
+    name = models.CharField(max_length=100, default="")
+    email = models.EmailField(default="")
+    phone = models.CharField(max_length=20, default="", blank=True)
+    special_request = models.TextField(null=True, blank=True)
+
+    date = models.DateField(db_index=True)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    capacity = models.PositiveIntegerField(default=1)
+
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    is_paid = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
+
+    used_pass = models.BooleanField(default=False)
+    used_subscription = models.BooleanField(default=False)
+    client_purchase = models.ForeignKey('payments.ClientPurchase', on_delete=models.SET_NULL, null=True, blank=True, related_name='saltroom_bookings')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.booking_id} | {self.name or (self.user.email if self.user else 'Guest')} | {self.date} {self.start_time}"
+
+    def save(self, *args, **kwargs):
+        if self.payment_status == 'paid':
+            self.is_paid = True
+        elif not self.is_paid:
+            self.payment_status = self.payment_status or 'pending'
+
+        if not self.id:
+            super().save(*args, **kwargs)
+        if not self.booking_id:
+            self.booking_id = f"SR-{self.id:04d}"
+            super().save(update_fields=['booking_id', 'is_paid', 'payment_status', 'status'])
+        else:
+            super().save(*args, **kwargs)

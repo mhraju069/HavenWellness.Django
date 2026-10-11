@@ -1,7 +1,11 @@
 from services.models import Activities
 from rest_framework import serializers
 from .models import *
-from payments.serializers import SessionPassSerializer, SubscriptionPlansSerializer 
+from payments.serializers import (
+    SessionPassSerializer,
+    SubscriptionPlansSerializer,
+    ClientPurchaseSerializer,
+) 
 
 
 class ServicesSerializer(serializers.ModelSerializer):
@@ -110,6 +114,7 @@ class SaltroomServiceSerializer(serializers.Serializer):
     saltroom = SaltroomSerializer(many=True, required=False)
     subscription_plans = SubscriptionPlansSerializer(many=True, required=False)
     session_pass = SessionPassSerializer(many=True, required=False)
+    user_membership = serializers.DictField(required=False, allow_null=True)
 
 
 #Package Services

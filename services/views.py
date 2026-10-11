@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, time
 from django.utils import timezone
 from .models import *
-from payments.models import SubscriptionPlans, SessionPass
-from bookings.models import SaunaBooking, LunchroomBooking, ActivityBooking, EventBooking
+from payments.models import SubscriptionPlans, SessionPass, ClientPurchase
+from bookings.models import SaunaBooking, LunchroomBooking, ActivityBooking, EventBooking, SaltRoomBooking
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -96,10 +96,84 @@ class ServiceDetailView(APIView):
             subscription_plans = SubscriptionPlans.objects.prefetch_related('features').filter(plan_category='saltroom')
             session_pass = SessionPass.objects.prefetch_related('features').all()
 
+            # Check authenticated customer memberships, session passes, and limits
+            user = request.user if request.user and request.user.is_authenticated else None
+            user_membership_data = {
+                "is_authenticated": bool(user),
+                "has_active_pass": False,
+                "has_active_subscription": False,
+                "session_pass": None,
+                "subscription": None,
+                "total_available_sessions": 0,
+            }
+
+            if user:
+                now = timezone.now()
+
+                # 1. Active Session Passes (passes do not expire or have no end_date, must be paid/confirmed with remaining_sessions > 0)
+                active_passes = ClientPurchase.objects.filter(
+                    user=user,
+                    purchase_type='session_pass',
+                    payment_status='paid',
+                    status='confirmed',
+                    remaining_sessions__gt=0,
+                ).order_by('-created_at')
+
+                latest_pass = active_passes.first()
+                if latest_pass:
+                    total_pass_sessions = sum(p.remaining_sessions for p in active_passes)
+                    user_membership_data["has_active_pass"] = True
+                    user_membership_data["session_pass"] = {
+                        "purchase_id": latest_pass.purchase_id,
+                        "name": latest_pass.session_pass.name if latest_pass.session_pass else "Session Pass",
+                        "remaining_sessions": latest_pass.remaining_sessions,
+                        "total_sessions": latest_pass.total_sessions,
+                        "total_remaining_across_all_passes": total_pass_sessions,
+                        "max_active_reservations": latest_pass.max_active_reservations or 10,
+                        "status": latest_pass.status,
+                        "payment_status": latest_pass.payment_status,
+                    }
+                    user_membership_data["total_available_sessions"] += total_pass_sessions
+
+                # 2. Active Subscriptions (saltroom or general, paid/confirmed, and end_date in future)
+                active_sub = ClientPurchase.objects.filter(
+                    user=user,
+                    purchase_type='subscription',
+                    payment_status='paid',
+                    status='confirmed',
+                ).filter(
+                    models.Q(end_date__isnull=True) | models.Q(end_date__gt=now)
+                ).filter(
+                    models.Q(subscription_plan__plan_category='saltroom') | models.Q(subscription_plan__isnull=True)
+                ).order_by('-created_at').first()
+
+                if active_sub:
+                    plan = active_sub.subscription_plan
+                    is_unlimited = plan and plan.plan_type == 'unlimited'
+                    user_membership_data["has_active_subscription"] = True
+                    user_membership_data["subscription"] = {
+                        "purchase_id": active_sub.purchase_id,
+                        "name": plan.name if plan else "Subscription Plan",
+                        "plan_type": plan.plan_type if plan else "unlimited",
+                        "plan_category": plan.plan_category if plan else "saltroom",
+                        "start_date": active_sub.start_date,
+                        "end_date": active_sub.end_date,
+                        "is_unlimited": is_unlimited,
+                        "remaining_sessions": active_sub.remaining_sessions,
+                        "total_sessions": active_sub.total_sessions,
+                        "sessions_per_week": active_sub.sessions_per_week,
+                        "max_active_reservations": active_sub.max_active_reservations or (10 if is_unlimited else 1),
+                        "status": active_sub.status,
+                        "payment_status": active_sub.payment_status,
+                    }
+                    if not is_unlimited:
+                        user_membership_data["total_available_sessions"] += active_sub.remaining_sessions
+
             serializer = SaltroomServiceSerializer({
                 "saltroom": saltroom,
                 "subscription_plans": subscription_plans,
                 "session_pass": session_pass,
+                "user_membership": user_membership_data,
             }, context={'request': request})
 
             return Response({
@@ -151,7 +225,7 @@ class GetSlotView(APIView):
         tags=["Services"],
         summary="Get available slots for a service (sauna, package, lunchroom, activity, etc.)",
         parameters=[
-            OpenApiParameter(name="type", description="Service Type: 'package', 'sauna', 'private_sauna', 'shared_sauna', 'lunchroom', 'activity'", required=False, type=str),
+            OpenApiParameter(name="type", description="Service Type: 'package', 'sauna', 'private_sauna', 'shared_sauna', 'lunchroom', 'activity', 'saltroom'", required=False, type=str),
             OpenApiParameter(name="sub_type", description="Optional Sub-service Type filter for packages (e.g. sauna, private_sauna, shared_sauna, lunchroom, activity)", required=False, type=str),
             OpenApiParameter(name="date", description="Date (YYYY-MM-DD)", required=True, type=str),
         ],
@@ -329,6 +403,213 @@ class GetSlotView(APIView):
         activities_serializer = ActivitiesSerializer(activities_on_date, many=True, context={'request': request})
 
         # -------------------------------------------------------------
+        # E. SALTROOM AVAILABILITY (Session-based, not slot-based)
+        # -------------------------------------------------------------
+        saltroom_data = None
+        if s_type == 'saltroom':
+            saltroom_obj = Saltroom.objects.first()
+            user = request.user if request.user and request.user.is_authenticated else None
+            user_membership_data = {
+                "is_authenticated": bool(user),
+                "has_active_pass": False,
+                "has_active_subscription": False,
+                "session_pass": None,
+                "subscription": None,
+                "total_available_sessions": 0,
+            }
+
+            if user:
+                now = timezone.now()
+
+                active_passes = ClientPurchase.objects.filter(
+                    user=user,
+                    purchase_type='session_pass',
+                    payment_status='paid',
+                    status='confirmed',
+                    remaining_sessions__gt=0,
+                ).order_by('-created_at')
+
+                latest_pass = active_passes.first()
+                if latest_pass:
+                    total_pass_sessions = sum(p.remaining_sessions for p in active_passes)
+                    user_membership_data["has_active_pass"] = True
+                    user_membership_data["session_pass"] = {
+                        "purchase_id": latest_pass.purchase_id,
+                        "name": latest_pass.session_pass.name if latest_pass.session_pass else "Session Pass",
+                        "remaining_sessions": latest_pass.remaining_sessions,
+                        "total_sessions": latest_pass.total_sessions,
+                        "total_remaining_across_all_passes": total_pass_sessions,
+                        "max_active_reservations": latest_pass.max_active_reservations or 10,
+                        "status": latest_pass.status,
+                        "payment_status": latest_pass.payment_status,
+                    }
+                    user_membership_data["total_available_sessions"] += total_pass_sessions
+
+                active_sub = ClientPurchase.objects.filter(
+                    user=user,
+                    purchase_type='subscription',
+                    payment_status='paid',
+                    status='confirmed',
+                ).filter(
+                    models.Q(end_date__isnull=True) | models.Q(end_date__gt=now)
+                ).filter(
+                    models.Q(subscription_plan__plan_category='saltroom') | models.Q(subscription_plan__isnull=True)
+                ).order_by('-created_at').first()
+
+                if active_sub:
+                    plan = active_sub.subscription_plan
+                    is_unlimited = plan and plan.plan_type == 'unlimited'
+                    sub_active = True
+
+                    # 1. Date validity check (within start_date and end_date)
+                    is_date_valid = True
+                    if active_sub.start_date and target_date < active_sub.start_date.date():
+                        is_date_valid = False
+                    if active_sub.end_date and target_date > active_sub.end_date.date():
+                        is_date_valid = False
+
+                    # 2. Check bookings for the specific week of target_date
+                    # Monday of target_date week to Sunday of target_date week
+                    start_of_week = target_date - timedelta(days=target_date.weekday())
+                    end_of_week = start_of_week + timedelta(days=6)
+
+                    week_bookings_count = SaltRoomBooking.objects.filter(
+                        client_purchase=active_sub,
+                        date__gte=start_of_week,
+                        date__lte=end_of_week,
+                    ).exclude(status='cancelled').count()
+
+                    # 3. Check bookings for the specific target_date
+                    date_bookings_count = SaltRoomBooking.objects.filter(
+                        client_purchase=active_sub,
+                        date=target_date,
+                    ).exclude(status='cancelled').count()
+
+                    # Active future reservations
+                    active_future_reservations = SaltRoomBooking.objects.filter(
+                        client_purchase=active_sub,
+                        status='confirmed',
+                        date__gte=now.date(),
+                    ).count()
+                    max_allowed_res = active_sub.max_active_reservations or (10 if is_unlimited else 1)
+
+                    is_available_for_date = True
+                    is_available_for_week = True
+                    unavailable_reason = None
+
+                    if not is_date_valid:
+                        is_available_for_date = False
+                        is_available_for_week = False
+                        unavailable_reason = "Selected date falls outside the subscription validity period."
+                    elif not is_unlimited:
+                        # Weekly subscription checks:
+                        if active_sub.remaining_sessions <= 0:
+                            is_available_for_date = False
+                            is_available_for_week = False
+                            unavailable_reason = "No remaining sessions left in this subscription."
+                        elif week_bookings_count >= (active_sub.sessions_per_week or 1):
+                            is_available_for_date = False
+                            is_available_for_week = False
+                            unavailable_reason = f"Weekly session limit ({active_sub.sessions_per_week or 1}/week) already reached for this week."
+                        elif active_future_reservations >= max_allowed_res:
+                            is_available_for_date = False
+                            unavailable_reason = f"Maximum active upcoming reservations limit ({max_allowed_res}) reached."
+                    else:
+                        # Unlimited plan concurrent reservation check:
+                        if active_future_reservations >= max_allowed_res:
+                            is_available_for_date = False
+                            unavailable_reason = f"Maximum concurrent reservations limit ({max_allowed_res}) reached."
+
+                    user_membership_data["has_active_subscription"] = True
+                    user_membership_data["subscription"] = {
+                        "purchase_id": active_sub.purchase_id,
+                        "name": plan.name if plan else "Subscription Plan",
+                        "plan_type": plan.plan_type if plan else "unlimited",
+                        "plan_category": plan.plan_category if plan else "saltroom",
+                        "start_date": active_sub.start_date,
+                        "end_date": active_sub.end_date,
+                        "is_unlimited": is_unlimited,
+                        "remaining_sessions": active_sub.remaining_sessions,
+                        "total_sessions": active_sub.total_sessions,
+                        "sessions_per_week": active_sub.sessions_per_week,
+                        "max_active_reservations": max_allowed_res,
+                        "status": active_sub.status,
+                        "payment_status": active_sub.payment_status,
+                        # Availability flags for target_date & week:
+                        "is_available_for_date": is_available_for_date,
+                        "is_available_for_today": is_available_for_date,  # alias requested
+                        "is_available_for_week": is_available_for_week,
+                        "week_bookings_count": week_bookings_count,
+                        "date_bookings_count": date_bookings_count,
+                        "unavailable_reason": unavailable_reason,
+                    }
+                    if not is_unlimited:
+                        user_membership_data["total_available_sessions"] += active_sub.remaining_sessions
+
+
+            # Calculate saltroom slots and check existing bookings for target_date
+            duration_td = saltroom_obj.duration if saltroom_obj and saltroom_obj.duration else timedelta(minutes=60)
+            buffer_td = saltroom_obj.buffer_time if saltroom_obj and saltroom_obj.buffer_time else timedelta(minutes=10)
+            max_capacity = saltroom_obj.max_capacity if saltroom_obj and saltroom_obj.max_capacity else 2
+
+            step_td = duration_td + buffer_td
+            saltroom_bookings = SaltRoomBooking.objects.filter(
+                date=target_date
+            ).exclude(status='cancelled')
+
+            saltroom_slots = []
+            curr_dt = open_dt
+            while curr_dt + duration_td <= close_dt:
+                slot_start = curr_dt
+                slot_end = slot_start + duration_td
+                slot_buffer_end = slot_start + step_td
+
+                # Count bookings overlapping this slot
+                booked_capacity = 0
+                for sb in saltroom_bookings:
+                    sb_start = datetime.combine(target_date, sb.start_time)
+                    sb_end = datetime.combine(target_date, sb.end_time)
+                    # Overlap if max(slot_start, sb_start) < min(slot_end, sb_end)
+                    if max(slot_start, sb_start) < min(slot_end, sb_end):
+                        booked_capacity += sb.capacity
+
+                remaining_capacity = max(0, max_capacity - booked_capacity)
+                is_available = (remaining_capacity > 0)
+                is_fully_booked = (booked_capacity >= max_capacity)
+
+                saltroom_slots.append({
+                    "start_time": slot_start.strftime("%H:%M"),
+                    "end_time": slot_end.strftime("%H:%M"),
+                    "buffer_end_time": slot_buffer_end.strftime("%H:%M"),
+                    "duration_minutes": int(duration_td.total_seconds() // 60),
+                    "buffer_minutes": int(buffer_td.total_seconds() // 60),
+                    "max_capacity": max_capacity,
+                    "booked_capacity": booked_capacity,
+                    "remaining_capacity": remaining_capacity,
+                    "is_available": is_available,
+                    "is_fully_booked": is_fully_booked,
+                })
+
+                curr_dt = slot_buffer_end
+
+            available_slots_only = [s for s in saltroom_slots if s["is_available"]]
+
+            saltroom_data = {
+                "is_available": len(available_slots_only) > 0,
+                "open_time": open_time.strftime("%H:%M"),
+                "close_time": close_time.strftime("%H:%M"),
+                "duration_minutes": int(duration_td.total_seconds() // 60),
+                "buffer_minutes": int(buffer_td.total_seconds() // 60),
+                "max_capacity": max_capacity,
+                "price_per_person": str(saltroom_obj.price_per_person) if saltroom_obj else "25.00",
+                "total_slots_count": len(saltroom_slots),
+                "available_slots_count": len(available_slots_only),
+                "slots": saltroom_slots,
+                "available_slots": available_slots_only,
+                "user_membership": user_membership_data,
+            }
+
+        # -------------------------------------------------------------
         # Construct Response by Service Type / Package
         # -------------------------------------------------------------
         data = {}
@@ -366,6 +647,8 @@ class GetSlotView(APIView):
                 data["sauna"] = sauna_dict
                 data["lunchroom"] = lunchroom_data
                 data["activities"] = activities_serializer.data
+        elif s_type == 'saltroom':
+            data = saltroom_data
         elif s_type in ['lunchroom']:
             data = lunchroom_data
         elif s_type in ['activity', 'activities']:

@@ -1,3 +1,5 @@
+from datetime import timedelta
+from django.utils import duration
 from django.core.files import images
 from django.db import models
 
@@ -120,7 +122,10 @@ class Saltroom(models.Model):
     title = models.CharField(max_length=100)
     subtitle = models.CharField(max_length=100, default="")
     description = models.TextField()
+    max_capacity = models.PositiveIntegerField(default=2)
     images = models.ImageField(upload_to="saltroom", null=True, blank=True)
+    duration = models.DurationField(default=timedelta(minutes=60))
+    buffer_time = models.DurationField(default=timedelta(minutes=10))
     price_per_person = models.DecimalField(max_digits=10, decimal_places=2, default=25)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

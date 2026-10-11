@@ -5,11 +5,14 @@ from .views import (
     ActivityBookingAPIView,
     EventBookingAPIView,
     PackageBookingAPIView,
+    SaltRoomBookingAPIView,
 )
 
 urlpatterns = [
     path('sauna/', SaunaBookingAPIView.as_view(), name='sauna-booking'),
     path('sauna/confirm/', SaunaBookingAPIView.as_view(), name='sauna-booking-confirm'),
+    path('saltroom/', SaltRoomBookingAPIView.as_view(), name='saltroom-booking'),
+    path('saltroom/confirm/', SaltRoomBookingAPIView.as_view(), name='saltroom-booking-confirm'),
     path('lunchroom/', LunchroomBookingAPIView.as_view(), name='lunchroom-booking'),
     path('lunchroom/confirm/', LunchroomBookingAPIView.as_view(), name='lunchroom-booking-confirm'),
     path('activities/', ActivityBookingAPIView.as_view(), name='activity-booking'),

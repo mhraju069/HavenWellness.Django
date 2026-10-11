@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import SaunaBooking, LunchroomBooking, ActivityBooking, EventBooking, PackageBooking
+from .models import SaunaBooking, LunchroomBooking, ActivityBooking, EventBooking, PackageBooking, SaltRoomBooking
 
 
 class PackageBookingSerializer(serializers.ModelSerializer):
@@ -243,5 +243,53 @@ class EventBookingSerializer(serializers.ModelSerializer):
         if request and request.user and request.user.is_authenticated:
             validated_data['user'] = request.user
         return super().create(validated_data)
+
+
+class SaltRoomBookingSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(required=True, help_text="Guest Name (Required)")
+    email = serializers.EmailField(required=True, help_text="Guest Email (Required)")
+    phone = serializers.CharField(required=False, default="", allow_blank=True, help_text="Guest Phone (Optional)")
+    date = serializers.DateField(required=True, help_text="Booking Date (YYYY-MM-DD)")
+    start_time = serializers.TimeField(required=True, help_text="Start Time (HH:MM or HH:MM:SS)")
+    end_time = serializers.TimeField(required=False, help_text="End Time (Auto-calculated if omitted)")
+    capacity = serializers.IntegerField(required=False, default=1, help_text="Number of people (max saltroom capacity)")
+    special_request = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+
+    # Membership / Payment mode selection
+    payment_mode = serializers.ChoiceField(
+        choices=['pass', 'subscription', 'weekly_subscription', 'unlimited_subscription', 'card'],
+        required=False,
+        default='card',
+        write_only=True,
+        help_text="Booking payment method: 'card' (single session €25), 'pass' (10 session pass), 'subscription' (auto-detect or specified plan), 'weekly_subscription' (Once a week plan), or 'unlimited_subscription' (Unlimited plan)."
+    )
+    purchase_id = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        write_only=True,
+        help_text="Existing active ClientPurchase purchase_id (e.g. PASS-0001 or SUB-0001) to deduct session from."
+    )
+    plan_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        write_only=True,
+        help_text="SubscriptionPlan ID to purchase if user does not already have an active subscription."
+    )
+    pass_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        write_only=True,
+        help_text="SessionPass ID to purchase if user does not already have an active pass."
+    )
+
+    class Meta:
+        model = SaltRoomBooking
+        fields = '__all__'
+        read_only_fields = [
+            'id', 'booking_id', 'user', 'is_paid', 'status', 'payment_status',
+            'used_pass', 'used_subscription', 'client_purchase', 'total_price',
+            'created_at', 'updated_at'
+        ]
 
 

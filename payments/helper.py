@@ -157,6 +157,11 @@ def send_booking_confirmation_email(booking):
             booking_date_display = str(booking.date)
             booking_time_display = f"{booking.start_time} - {booking.end_time}"
             time_slot_display = ""
+        elif hasattr(booking, 'start_time') and hasattr(booking, 'date') and (hasattr(booking, 'used_pass') or booking.booking_id.startswith('SR-')):
+            booking_type_display = 'Saltroom Session'
+            booking_date_display = str(booking.date)
+            booking_time_display = f"{booking.start_time} - {booking.end_time}"
+            time_slot_display = "Saltroom"
         else:
             booking_type_display = 'Lunchroom'
             booking_date_display = str(getattr(booking, 'booking_date', ''))

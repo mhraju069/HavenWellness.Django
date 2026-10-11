@@ -12,7 +12,7 @@ from djstripe.models import PaymentIntent, Customer, Subscription, Event
 
 from .helper import send_booking_confirmation_email
 from .models import Payments, ClientPurchase, SessionPass, SubscriptionPlans
-from bookings.models import SaunaBooking, ActivityBooking, PackageBooking
+from bookings.models import SaunaBooking, ActivityBooking, PackageBooking, SaltRoomBooking
 from .serializers import (
     PaymentsSerializer,
     CreatePaymentIntentRequestSerializer,
@@ -39,6 +39,9 @@ def create_payment_intent_for_booking(booking, currency="eur"):
         else:
             booking_type_val = 'subscription'
             booking_label = 'Subscription'
+    elif hasattr(booking, 'start_time') and hasattr(booking, 'date') and (hasattr(booking, 'used_pass') or booking.booking_id.startswith('SR-')):
+        booking_type_val = 'saltroom'
+        booking_label = 'Saltroom'
     elif hasattr(booking, 'booked_services_ids') or booking.booking_id.startswith('PKG-'):
         booking_type_val = 'packages'
         booking_label = 'Package'
@@ -83,6 +86,8 @@ def create_payment_intent_for_booking(booking, currency="eur"):
             metadata['plan_name'] = booking.subscription_plan.name
             metadata['plan_type'] = booking.subscription_plan.plan_type
             metadata['plan_category'] = booking.subscription_plan.plan_category
+    elif booking_type_val == 'saltroom':
+        metadata['saltroom_booking_id'] = str(booking.id)
     elif booking_type_val == 'activities':
         metadata['activity_booking_id'] = str(booking.id)
         if hasattr(booking, 'activity') and booking.activity:
@@ -157,6 +162,7 @@ class CreatePaymentIntentAPIView(APIView):
 
         booking = (
             SaunaBooking.objects.filter(booking_id=booking_id_input).first()
+            or SaltRoomBooking.objects.filter(booking_id=booking_id_input).first()
             or ActivityBooking.objects.filter(booking_id=booking_id_input).first()
             or PackageBooking.objects.filter(booking_id=booking_id_input).first()
             or ClientPurchase.objects.filter(purchase_id=booking_id_input).first()
@@ -164,6 +170,7 @@ class CreatePaymentIntentAPIView(APIView):
         if not booking and booking_id_input.isdigit():
             booking = (
                 SaunaBooking.objects.filter(id=int(booking_id_input)).first()
+                or SaltRoomBooking.objects.filter(id=int(booking_id_input)).first()
                 or ActivityBooking.objects.filter(id=int(booking_id_input)).first()
                 or ClientPurchase.objects.filter(id=int(booking_id_input)).first()
             )
@@ -412,6 +419,7 @@ class ConfirmPaymentAPIView(APIView):
             booking_obj = (
                 ClientPurchase.objects.filter(purchase_id=target_id).first()
                 or SaunaBooking.objects.filter(booking_id=target_id).first()
+                or SaltRoomBooking.objects.filter(booking_id=target_id).first()
                 or ActivityBooking.objects.filter(booking_id=target_id).first()
                 or PackageBooking.objects.filter(booking_id=target_id).first()
             )
@@ -420,7 +428,42 @@ class ConfirmPaymentAPIView(APIView):
             if is_paid:
                 booking_obj.payment_status = 'paid'
                 booking_obj.status = 'confirmed'
+                if hasattr(booking_obj, 'is_paid'):
+                    booking_obj.is_paid = True
                 booking_obj.save()
+
+                # If ClientPurchase is paid, also confirm any linked SaltRoomBooking and deduct 1 session
+                if isinstance(booking_obj, ClientPurchase):
+                    linked_sr_booking = SaltRoomBooking.objects.filter(client_purchase=booking_obj, payment_status='pending').first()
+                    if linked_sr_booking:
+                        linked_sr_booking.payment_status = 'paid'
+                        linked_sr_booking.status = 'confirmed'
+                        linked_sr_booking.is_paid = True
+                        linked_sr_booking.save()
+                        # Deduct session if not unlimited
+                        if booking_obj.subscription_plan and booking_obj.subscription_plan.plan_type != 'unlimited':
+                            booking_obj.remaining_sessions = max(0, booking_obj.remaining_sessions - 1)
+                            booking_obj.save(update_fields=['remaining_sessions'])
+                        elif booking_obj.purchase_type == 'session_pass':
+                            booking_obj.remaining_sessions = max(0, booking_obj.remaining_sessions - 1)
+                            booking_obj.save(update_fields=['remaining_sessions'])
+                        try:
+                            send_booking_confirmation_email(linked_sr_booking)
+                        except Exception as sr_mail_err:
+                            print("Linked Saltroom confirmation email error:", sr_mail_err)
+
+                # If SaltRoomBooking is paid and has linked ClientPurchase pending, confirm purchase too
+                elif isinstance(booking_obj, SaltRoomBooking) and booking_obj.client_purchase:
+                    cp = booking_obj.client_purchase
+                    if cp.payment_status == 'pending':
+                        cp.payment_status = 'paid'
+                        cp.status = 'confirmed'
+                        if cp.subscription_plan and cp.subscription_plan.plan_type != 'unlimited':
+                            cp.remaining_sessions = max(0, cp.remaining_sessions - 1)
+                        elif cp.purchase_type == 'session_pass':
+                            cp.remaining_sessions = max(0, cp.remaining_sessions - 1)
+                        cp.save()
+
                 try:
                     send_booking_confirmation_email(booking_obj)
                 except Exception as mail_err:
@@ -485,6 +528,7 @@ class PaymentSuccessView(APIView):
                 booking_obj = (
                     ClientPurchase.objects.filter(purchase_id=target_id).first()
                     or SaunaBooking.objects.filter(booking_id=target_id).first()
+                    or SaltRoomBooking.objects.filter(booking_id=target_id).first()
                     or ActivityBooking.objects.filter(booking_id=target_id).first()
                     or PackageBooking.objects.filter(booking_id=target_id).first()
                 )
@@ -554,6 +598,7 @@ class StripeWebhookView(APIView):
             if target_booking_id:
                 booking_obj = (
                     SaunaBooking.objects.filter(booking_id=target_booking_id).first()
+                    or SaltRoomBooking.objects.filter(booking_id=target_booking_id).first()
                     or ActivityBooking.objects.filter(booking_id=target_booking_id).first()
                     or PackageBooking.objects.filter(booking_id=target_booking_id).first()
                     or ClientPurchase.objects.filter(purchase_id=target_booking_id).first()
@@ -561,7 +606,39 @@ class StripeWebhookView(APIView):
                 if booking_obj:
                     booking_obj.payment_status = 'paid'
                     booking_obj.status = 'confirmed'
+                    if hasattr(booking_obj, 'is_paid'):
+                        booking_obj.is_paid = True
                     booking_obj.save()
+
+                    # Handle linked SaltRoomBooking / ClientPurchase
+                    if isinstance(booking_obj, ClientPurchase):
+                        linked_sr = SaltRoomBooking.objects.filter(client_purchase=booking_obj, payment_status='pending').first()
+                        if linked_sr:
+                            linked_sr.payment_status = 'paid'
+                            linked_sr.status = 'confirmed'
+                            linked_sr.is_paid = True
+                            linked_sr.save()
+                            if booking_obj.subscription_plan and booking_obj.subscription_plan.plan_type != 'unlimited':
+                                booking_obj.remaining_sessions = max(0, booking_obj.remaining_sessions - 1)
+                                booking_obj.save(update_fields=['remaining_sessions'])
+                            elif booking_obj.purchase_type == 'session_pass':
+                                booking_obj.remaining_sessions = max(0, booking_obj.remaining_sessions - 1)
+                                booking_obj.save(update_fields=['remaining_sessions'])
+                            try:
+                                send_booking_confirmation_email(linked_sr)
+                            except Exception:
+                                pass
+                    elif isinstance(booking_obj, SaltRoomBooking) and booking_obj.client_purchase:
+                        cp = booking_obj.client_purchase
+                        if cp.payment_status == 'pending':
+                            cp.payment_status = 'paid'
+                            cp.status = 'confirmed'
+                            if cp.subscription_plan and cp.subscription_plan.plan_type != 'unlimited':
+                                cp.remaining_sessions = max(0, cp.remaining_sessions - 1)
+                            elif cp.purchase_type == 'session_pass':
+                                cp.remaining_sessions = max(0, cp.remaining_sessions - 1)
+                            cp.save()
+
                     send_booking_confirmation_email(booking_obj)
 
         elif event_type in ['payment_intent.payment_failed']:
@@ -575,7 +652,10 @@ class StripeWebhookView(APIView):
             booking_id = metadata.get('booking_id') or metadata.get('booking')
             target_booking_id = booking_id or (payment.booking_id if payment else None)
             if target_booking_id:
-                booking_obj = ClientPurchase.objects.filter(purchase_id=target_booking_id).first()
+                booking_obj = (
+                    ClientPurchase.objects.filter(purchase_id=target_booking_id).first()
+                    or SaltRoomBooking.objects.filter(booking_id=target_booking_id).first()
+                )
                 if booking_obj:
                     booking_obj.payment_status = 'failed'
                     booking_obj.save()
@@ -605,6 +685,7 @@ def handle_djstripe_payment_succeeded(event, **kwargs):
     if target_booking_id:
         booking_obj = (
             SaunaBooking.objects.filter(booking_id=target_booking_id).first()
+            or SaltRoomBooking.objects.filter(booking_id=target_booking_id).first()
             or ActivityBooking.objects.filter(booking_id=target_booking_id).first()
             or PackageBooking.objects.filter(booking_id=target_booking_id).first()
             or ClientPurchase.objects.filter(purchase_id=target_booking_id).first()
@@ -612,8 +693,40 @@ def handle_djstripe_payment_succeeded(event, **kwargs):
         if booking_obj:
             booking_obj.payment_status = 'paid'
             booking_obj.status = 'confirmed'
+            if hasattr(booking_obj, 'is_paid'):
+                booking_obj.is_paid = True
             booking_obj.save()
+
+            if isinstance(booking_obj, ClientPurchase):
+                linked_sr = SaltRoomBooking.objects.filter(client_purchase=booking_obj, payment_status='pending').first()
+                if linked_sr:
+                    linked_sr.payment_status = 'paid'
+                    linked_sr.status = 'confirmed'
+                    linked_sr.is_paid = True
+                    linked_sr.save()
+                    if booking_obj.subscription_plan and booking_obj.subscription_plan.plan_type != 'unlimited':
+                        booking_obj.remaining_sessions = max(0, booking_obj.remaining_sessions - 1)
+                        booking_obj.save(update_fields=['remaining_sessions'])
+                    elif booking_obj.purchase_type == 'session_pass':
+                        booking_obj.remaining_sessions = max(0, booking_obj.remaining_sessions - 1)
+                        booking_obj.save(update_fields=['remaining_sessions'])
+                    try:
+                        send_booking_confirmation_email(linked_sr)
+                    except Exception:
+                        pass
+            elif isinstance(booking_obj, SaltRoomBooking) and booking_obj.client_purchase:
+                cp = booking_obj.client_purchase
+                if cp.payment_status == 'pending':
+                    cp.payment_status = 'paid'
+                    cp.status = 'confirmed'
+                    if cp.subscription_plan and cp.subscription_plan.plan_type != 'unlimited':
+                        cp.remaining_sessions = max(0, cp.remaining_sessions - 1)
+                    elif cp.purchase_type == 'session_pass':
+                        cp.remaining_sessions = max(0, cp.remaining_sessions - 1)
+                    cp.save()
+
             send_booking_confirmation_email(booking_obj)
+
 
 
 @djstripe_receiver("payment_intent.payment_failed")
