@@ -242,10 +242,32 @@ class SaltRoomBookingAPIView(generics.ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
 
         data = serializer.validated_data
-        payment_mode = data.get('payment_mode', 'card')
-        chosen_purchase_id = data.get('purchase_id')
-        chosen_plan_id = data.get('plan_id')
-        chosen_pass_id = data.get('pass_id')
+        raw_data = request.data if isinstance(request.data, dict) else {}
+        payment_mode = data.get('payment_mode') or raw_data.get('payment_mode') or 'card'
+        chosen_purchase_id = data.get('purchase_id') or raw_data.get('purchase_id')
+        chosen_plan_id = data.get('plan_id') or data.get('purchase_plan_id') or raw_data.get('plan_id') or raw_data.get('purchase_plan_id')
+        chosen_pass_id = data.get('pass_id') or data.get('purchase_pass_id') or raw_data.get('pass_id') or raw_data.get('purchase_pass_id')
+        req_plan_type = data.get('plan_type') or raw_data.get('plan_type') or ''
+
+        # If payment_mode is card/pass/subscription but plan_id or plan_type is provided:
+        if chosen_plan_id:
+            # Check if this plan_id is a subscription plan
+            sp = SubscriptionPlans.objects.filter(id=chosen_plan_id).first()
+            if sp:
+                if sp.plan_type == 'unlimited':
+                    payment_mode = 'unlimited_subscription'
+                elif sp.plan_type == 'weekly':
+                    payment_mode = 'weekly_subscription'
+                else:
+                    payment_mode = 'subscription'
+        elif req_plan_type in ['unlimited', 'unlimited_subscription']:
+            payment_mode = 'unlimited_subscription'
+        elif req_plan_type in ['weekly', 'weekly_subscription']:
+            payment_mode = 'weekly_subscription'
+        elif chosen_pass_id or req_plan_type in ['pass', 'session_pass']:
+            if payment_mode == 'card':
+                payment_mode = 'pass'
+
         user = request.user if request.user and request.user.is_authenticated else None
 
         date = data['date']
@@ -456,10 +478,30 @@ class SaltRoomBookingAPIView(generics.ListCreateAPIView):
             elif payment_mode == 'weekly_subscription':
                 sub_query = sub_query.filter(subscription_plan__plan_type='weekly')
 
-            if chosen_purchase_id:
-                sub_query = sub_query.filter(purchase_id=chosen_purchase_id)
-
-            client_purchase_obj = sub_query.order_by('-created_at').first()
+            # If payment_mode is generic 'subscription', find whichever subscription is valid for this date
+            if payment_mode == 'subscription' and not chosen_purchase_id:
+                # Prioritize one that has valid session for this date
+                candidate_subs = list(sub_query.order_by('-created_at'))
+                chosen_sub = None
+                for c in candidate_subs:
+                    c_plan = c.subscription_plan
+                    c_is_unlimited = c_plan and c_plan.plan_type == 'unlimited'
+                    if c_is_unlimited:
+                        c_active_res = SaltRoomBooking.objects.filter(client_purchase=c, status='confirmed', date__gte=now.date()).count()
+                        c_max = c.max_active_reservations or (c_plan.max_reservations if c_plan else 10) or 10
+                        if c_active_res < c_max:
+                            chosen_sub = c
+                            break
+                    else:
+                        start_of_w = date - timedelta(days=date.weekday())
+                        end_of_w = start_of_w + timedelta(days=6)
+                        c_w_count = SaltRoomBooking.objects.filter(client_purchase=c, date__gte=start_of_w, date__lte=end_of_w).exclude(status='cancelled').count()
+                        if c.remaining_sessions > 0 and c_w_count < (c.sessions_per_week or 1):
+                            chosen_sub = c
+                            break
+                client_purchase_obj = chosen_sub or (candidate_subs[0] if candidate_subs else None)
+            else:
+                client_purchase_obj = sub_query.order_by('-created_at').first()
 
             if client_purchase_obj:
                 # User has an active subscription! Use it.
@@ -472,20 +514,37 @@ class SaltRoomBookingAPIView(generics.ListCreateAPIView):
                             "error": "You have exhausted the sessions for this subscription."
                         }, status=status.HTTP_400_BAD_REQUEST)
 
+                    # Enforce weekly limit: 1 session per calendar week (Monday-Sunday)
+                    start_of_week = date - timedelta(days=date.weekday())
+                    end_of_week = start_of_week + timedelta(days=6)
+                    week_bookings = SaltRoomBooking.objects.filter(
+                        client_purchase=client_purchase_obj,
+                        date__gte=start_of_week,
+                        date__lte=end_of_week,
+                    ).exclude(status='cancelled').count()
+
+                    if week_bookings >= (client_purchase_obj.sessions_per_week or 1):
+                        return Response({
+                            "success": False,
+                            "error": f"Weekly session limit ({client_purchase_obj.sessions_per_week or 1}/week) already reached for the week of {start_of_week} to {end_of_week}."
+                        }, status=status.HTTP_400_BAD_REQUEST)
+
+                    client_purchase_obj.remaining_sessions = max(0, client_purchase_obj.remaining_sessions - 1)
+                    client_purchase_obj.save(update_fields=['remaining_sessions'])
+                else:
+                    # Unlimited subscription: check concurrent active reservations (max 10)
                     active_reservations = SaltRoomBooking.objects.filter(
                         client_purchase=client_purchase_obj,
                         status='confirmed',
                         date__gte=now.date(),
                     ).count()
-                    max_allowed = client_purchase_obj.max_active_reservations or 1
+                    max_allowed = client_purchase_obj.max_active_reservations or (plan.max_reservations if plan else 10) or 10
                     if active_reservations >= max_allowed:
                         return Response({
                             "success": False,
-                            "error": f"You already have {active_reservations} active upcoming booking(s) under this plan (Limit: {max_allowed})."
+                            "error": f"Maximum concurrent reservations limit ({max_allowed}) reached for your Unlimited plan."
                         }, status=status.HTTP_400_BAD_REQUEST)
 
-                    client_purchase_obj.remaining_sessions = max(0, client_purchase_obj.remaining_sessions - 1)
-                    client_purchase_obj.save(update_fields=['remaining_sessions'])
 
                 booking = SaltRoomBooking.objects.create(
                     user=user,

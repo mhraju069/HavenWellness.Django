@@ -445,7 +445,7 @@ class GetSlotView(APIView):
                     }
                     user_membership_data["total_available_sessions"] += total_pass_sessions
 
-                active_sub = ClientPurchase.objects.filter(
+                active_subs = ClientPurchase.objects.filter(
                     user=user,
                     purchase_type='subscription',
                     payment_status='paid',
@@ -454,97 +454,142 @@ class GetSlotView(APIView):
                     models.Q(end_date__isnull=True) | models.Q(end_date__gt=now)
                 ).filter(
                     models.Q(subscription_plan__plan_category='saltroom') | models.Q(subscription_plan__isnull=True)
-                ).order_by('-created_at').first()
+                ).order_by('-created_at')
 
-                if active_sub:
-                    plan = active_sub.subscription_plan
-                    is_unlimited = plan and plan.plan_type == 'unlimited'
-                    sub_active = True
+                # Separate weekly vs unlimited subscriptions
+                weekly_sub = active_subs.filter(subscription_plan__plan_type='weekly').first()
+                unlimited_sub = active_subs.filter(subscription_plan__plan_type='unlimited').first()
 
-                    # 1. Date validity check (within start_date and end_date)
-                    is_date_valid = True
-                    if active_sub.start_date and target_date < active_sub.start_date.date():
-                        is_date_valid = False
-                    if active_sub.end_date and target_date > active_sub.end_date.date():
-                        is_date_valid = False
+                # Start of week (Monday) and end of week (Sunday) for target_date
+                start_of_week = target_date - timedelta(days=target_date.weekday())
+                end_of_week = start_of_week + timedelta(days=6)
 
-                    # 2. Check bookings for the specific week of target_date
-                    # Monday of target_date week to Sunday of target_date week
-                    start_of_week = target_date - timedelta(days=target_date.weekday())
-                    end_of_week = start_of_week + timedelta(days=6)
+                # Process Weekly Subscription
+                weekly_sub_data = None
+                if weekly_sub:
+                    w_plan = weekly_sub.subscription_plan
+                    w_valid = True
+                    if weekly_sub.start_date and target_date < weekly_sub.start_date.date():
+                        w_valid = False
+                    if weekly_sub.end_date and target_date > weekly_sub.end_date.date():
+                        w_valid = False
 
-                    week_bookings_count = SaltRoomBooking.objects.filter(
-                        client_purchase=active_sub,
+                    w_week_bookings = SaltRoomBooking.objects.filter(
+                        client_purchase=weekly_sub,
                         date__gte=start_of_week,
                         date__lte=end_of_week,
                     ).exclude(status='cancelled').count()
 
-                    # 3. Check bookings for the specific target_date
-                    date_bookings_count = SaltRoomBooking.objects.filter(
-                        client_purchase=active_sub,
-                        date=target_date,
-                    ).exclude(status='cancelled').count()
-
-                    # Active future reservations
-                    active_future_reservations = SaltRoomBooking.objects.filter(
-                        client_purchase=active_sub,
+                    w_future_res = SaltRoomBooking.objects.filter(
+                        client_purchase=weekly_sub,
                         status='confirmed',
                         date__gte=now.date(),
                     ).count()
-                    max_allowed_res = active_sub.max_active_reservations or (10 if is_unlimited else 1)
+                    w_max_res = weekly_sub.max_active_reservations or 1
 
-                    is_available_for_date = True
-                    is_available_for_week = True
-                    unavailable_reason = None
+                    w_avail_date = True
+                    w_avail_week = True
+                    w_reason = None
 
-                    if not is_date_valid:
-                        is_available_for_date = False
-                        is_available_for_week = False
-                        unavailable_reason = "Selected date falls outside the subscription validity period."
-                    elif not is_unlimited:
-                        # Weekly subscription checks:
-                        if active_sub.remaining_sessions <= 0:
-                            is_available_for_date = False
-                            is_available_for_week = False
-                            unavailable_reason = "No remaining sessions left in this subscription."
-                        elif week_bookings_count >= (active_sub.sessions_per_week or 1):
-                            is_available_for_date = False
-                            is_available_for_week = False
-                            unavailable_reason = f"Weekly session limit ({active_sub.sessions_per_week or 1}/week) already reached for this week."
-                        elif active_future_reservations >= max_allowed_res:
-                            is_available_for_date = False
-                            unavailable_reason = f"Maximum active upcoming reservations limit ({max_allowed_res}) reached."
-                    else:
-                        # Unlimited plan concurrent reservation check:
-                        if active_future_reservations >= max_allowed_res:
-                            is_available_for_date = False
-                            unavailable_reason = f"Maximum concurrent reservations limit ({max_allowed_res}) reached."
+                    if not w_valid:
+                        w_avail_date = False
+                        w_avail_week = False
+                        w_reason = "Selected date falls outside this subscription validity period."
+                    elif weekly_sub.remaining_sessions <= 0:
+                        w_avail_date = False
+                        w_avail_week = False
+                        w_reason = "No remaining sessions left in this weekly subscription."
+                    elif w_week_bookings >= (weekly_sub.sessions_per_week or 1):
+                        w_avail_date = False
+                        w_avail_week = False
+                        w_reason = f"Weekly session limit ({weekly_sub.sessions_per_week or 1}/week) already reached for this week."
 
-                    user_membership_data["has_active_subscription"] = True
-                    user_membership_data["subscription"] = {
-                        "purchase_id": active_sub.purchase_id,
-                        "name": plan.name if plan else "Subscription Plan",
-                        "plan_type": plan.plan_type if plan else "unlimited",
-                        "plan_category": plan.plan_category if plan else "saltroom",
-                        "start_date": active_sub.start_date,
-                        "end_date": active_sub.end_date,
-                        "is_unlimited": is_unlimited,
-                        "remaining_sessions": active_sub.remaining_sessions,
-                        "total_sessions": active_sub.total_sessions,
-                        "sessions_per_week": active_sub.sessions_per_week,
-                        "max_active_reservations": max_allowed_res,
-                        "status": active_sub.status,
-                        "payment_status": active_sub.payment_status,
-                        # Availability flags for target_date & week:
-                        "is_available_for_date": is_available_for_date,
-                        "is_available_for_today": is_available_for_date,  # alias requested
-                        "is_available_for_week": is_available_for_week,
-                        "week_bookings_count": week_bookings_count,
-                        "date_bookings_count": date_bookings_count,
-                        "unavailable_reason": unavailable_reason,
+                    weekly_sub_data = {
+                        "purchase_id": weekly_sub.purchase_id,
+                        "name": w_plan.name if w_plan else "Weekly Subscription",
+                        "plan_type": "weekly",
+                        "plan_category": "saltroom",
+                        "start_date": weekly_sub.start_date,
+                        "end_date": weekly_sub.end_date,
+                        "is_unlimited": False,
+                        "remaining_sessions": weekly_sub.remaining_sessions,
+                        "total_sessions": weekly_sub.total_sessions,
+                        "sessions_per_week": weekly_sub.sessions_per_week or 1,
+                        "max_active_reservations": w_max_res,
+                        "status": weekly_sub.status,
+                        "payment_status": weekly_sub.payment_status,
+                        "is_available_for_date": w_avail_date,
+                        "is_available_for_today": w_avail_date,
+                        "is_available_for_week": w_avail_week,
+                        "week_bookings_count": w_week_bookings,
+                        "unavailable_reason": w_reason,
                     }
-                    if not is_unlimited:
-                        user_membership_data["total_available_sessions"] += active_sub.remaining_sessions
+                    user_membership_data["total_available_sessions"] += weekly_sub.remaining_sessions
+
+                # Process Unlimited Subscription
+                unlimited_sub_data = None
+                if unlimited_sub:
+                    u_plan = unlimited_sub.subscription_plan
+                    u_valid = True
+                    if unlimited_sub.start_date and target_date < unlimited_sub.start_date.date():
+                        u_valid = False
+                    if unlimited_sub.end_date and target_date > unlimited_sub.end_date.date():
+                        u_valid = False
+
+                    # Max 10 concurrent active upcoming reservations
+                    u_future_res = SaltRoomBooking.objects.filter(
+                        client_purchase=unlimited_sub,
+                        status='confirmed',
+                        date__gte=now.date(),
+                    ).count()
+                    u_max_res = unlimited_sub.max_active_reservations or (u_plan.max_reservations if u_plan else 10) or 10
+
+                    u_avail_date = True
+                    u_reason = None
+
+                    if not u_valid:
+                        u_avail_date = False
+                        u_reason = "Selected date falls outside this subscription validity period."
+                    elif u_future_res >= u_max_res:
+                        u_avail_date = False
+                        u_reason = f"Maximum concurrent reservations limit ({u_max_res}) reached. You currently have {u_future_res} active bookings."
+
+                    unlimited_sub_data = {
+                        "purchase_id": unlimited_sub.purchase_id,
+                        "name": u_plan.name if u_plan else "Unlimited Subscription",
+                        "plan_type": "unlimited",
+                        "plan_category": "saltroom",
+                        "start_date": unlimited_sub.start_date,
+                        "end_date": unlimited_sub.end_date,
+                        "is_unlimited": True,
+                        "remaining_sessions": "unlimited",
+                        "active_reservations_count": u_future_res,
+                        "max_active_reservations": u_max_res,
+                        "status": unlimited_sub.status,
+                        "payment_status": unlimited_sub.payment_status,
+                        "is_available_for_date": u_avail_date,
+                        "is_available_for_today": u_avail_date,
+                        "is_available_for_week": u_avail_date,  # Unlimited has no weekly limit
+                        "unavailable_reason": u_reason,
+                    }
+
+                # Set user_membership_data flags
+                user_membership_data["has_active_subscription"] = bool(weekly_sub or unlimited_sub)
+                user_membership_data["has_active_weekly_subscription"] = bool(weekly_sub)
+                user_membership_data["has_active_unlimited_subscription"] = bool(unlimited_sub)
+                user_membership_data["weekly_subscription"] = weekly_sub_data
+                user_membership_data["unlimited_subscription"] = unlimited_sub_data
+
+                # Default 'subscription' object: Prefer the one that is currently available, or the first active one
+                best_sub = None
+                if unlimited_sub_data and unlimited_sub_data["is_available_for_date"]:
+                    best_sub = unlimited_sub_data
+                elif weekly_sub_data and weekly_sub_data["is_available_for_date"]:
+                    best_sub = weekly_sub_data
+                else:
+                    best_sub = unlimited_sub_data or weekly_sub_data
+                user_membership_data["subscription"] = best_sub
+
 
 
             # Calculate saltroom slots and check existing bookings for target_date

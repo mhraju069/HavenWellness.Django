@@ -276,11 +276,30 @@ class SaltRoomBookingSerializer(serializers.ModelSerializer):
         write_only=True,
         help_text="SubscriptionPlan ID to purchase if user does not already have an active subscription."
     )
+    purchase_plan_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        write_only=True,
+        help_text="Alias for plan_id."
+    )
     pass_id = serializers.IntegerField(
         required=False,
         allow_null=True,
         write_only=True,
         help_text="SessionPass ID to purchase if user does not already have an active pass."
+    )
+    purchase_pass_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        write_only=True,
+        help_text="Alias for pass_id."
+    )
+    plan_type = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        write_only=True,
+        help_text="Optional plan type: 'weekly', 'unlimited', or 'pass'."
     )
 
     class Meta:
