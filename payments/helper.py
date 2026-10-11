@@ -142,6 +142,16 @@ def send_booking_confirmation_email(booking):
 
             if services_summary:
                 booking_time_display = ", ".join(services_summary)
+        elif hasattr(booking, 'purchase_type'):
+            if booking.purchase_type == 'session_pass':
+                pass_name = booking.session_pass.name if booking.session_pass else "Session Pass"
+                booking_type_display = f"Session Pass: {pass_name}"
+            else:
+                plan_name = booking.subscription_plan.name if booking.subscription_plan else "Subscription Plan"
+                booking_type_display = f"Subscription: {plan_name}"
+            booking_date_display = booking.created_at.strftime('%Y-%m-%d') if booking.created_at else ""
+            booking_time_display = booking.created_at.strftime('%H:%M') if booking.created_at else ""
+            time_slot_display = ""
         elif hasattr(booking, 'guests') and hasattr(booking, 'start_time'):
             booking_type_display = 'Event Booking'
             booking_date_display = str(booking.date)

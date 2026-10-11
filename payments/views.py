@@ -11,13 +11,17 @@ from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import PaymentIntent, Customer, Subscription, Event
 
 from .helper import send_booking_confirmation_email
-from .models import Payments
+from .models import Payments, ClientPurchase, SessionPass, SubscriptionPlans
 from bookings.models import SaunaBooking, ActivityBooking, PackageBooking
 from .serializers import (
     PaymentsSerializer,
     CreatePaymentIntentRequestSerializer,
     CreatePaymentIntentResponseSerializer,
     PaymentMessageResponseSerializer,
+    SessionPassSerializer,
+    SubscriptionPlansSerializer,
+    PurchaseRequestSerializer,
+    ClientPurchaseSerializer,
 )
 
 
@@ -28,8 +32,15 @@ def create_payment_intent_for_booking(booking, currency="eur"):
         return None, None, None
 
     # Detect booking type
-    if hasattr(booking, 'booked_services_ids') or booking.booking_id.startswith('PKG-'):
-        booking_type_val = 'package'
+    if hasattr(booking, 'purchase_type'):
+        if booking.purchase_type == 'session_pass':
+            booking_type_val = 'session_pass'
+            booking_label = 'Session Pass'
+        else:
+            booking_type_val = 'subscription'
+            booking_label = 'Subscription'
+    elif hasattr(booking, 'booked_services_ids') or booking.booking_id.startswith('PKG-'):
+        booking_type_val = 'packages'
         booking_label = 'Package'
     elif hasattr(booking, 'activity') or booking.booking_id.startswith('ACT-'):
         booking_type_val = 'activities'
@@ -62,7 +73,17 @@ def create_payment_intent_for_booking(booking, currency="eur"):
         'customer_email': booking.email,
         'customer_name': booking.name,
     }
-    if booking_type_val == 'activities':
+    if booking_type_val == 'session_pass':
+        metadata['purchase_id'] = booking.booking_id
+        if getattr(booking, 'session_pass', None):
+            metadata['pass_name'] = booking.session_pass.name
+    elif booking_type_val == 'subscription':
+        metadata['purchase_id'] = booking.booking_id
+        if getattr(booking, 'subscription_plan', None):
+            metadata['plan_name'] = booking.subscription_plan.name
+            metadata['plan_type'] = booking.subscription_plan.plan_type
+            metadata['plan_category'] = booking.subscription_plan.plan_category
+    elif booking_type_val == 'activities':
         metadata['activity_booking_id'] = str(booking.id)
         if hasattr(booking, 'activity') and booking.activity:
             metadata['activity_title'] = booking.activity.title
@@ -134,14 +155,21 @@ class CreatePaymentIntentAPIView(APIView):
         booking_id_input = serializer.validated_data.get('booking_id')
         currency = serializer.validated_data.get('currency', 'eur')
 
-        booking = SaunaBooking.objects.filter(booking_id=booking_id_input).first()
-        if not booking:
-            booking = ActivityBooking.objects.filter(booking_id=booking_id_input).first()
+        booking = (
+            SaunaBooking.objects.filter(booking_id=booking_id_input).first()
+            or ActivityBooking.objects.filter(booking_id=booking_id_input).first()
+            or PackageBooking.objects.filter(booking_id=booking_id_input).first()
+            or ClientPurchase.objects.filter(purchase_id=booking_id_input).first()
+        )
         if not booking and booking_id_input.isdigit():
-            booking = SaunaBooking.objects.filter(id=int(booking_id_input)).first() or ActivityBooking.objects.filter(id=int(booking_id_input)).first()
+            booking = (
+                SaunaBooking.objects.filter(id=int(booking_id_input)).first()
+                or ActivityBooking.objects.filter(id=int(booking_id_input)).first()
+                or ClientPurchase.objects.filter(id=int(booking_id_input)).first()
+            )
 
         if not booking:
-            return Response({"error": f"Booking with ID '{booking_id_input}' not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": f"Booking or purchase with ID '{booking_id_input}' not found."}, status=status.HTTP_404_NOT_FOUND)
 
         try:
             payment, client_secret, intent_id = create_payment_intent_for_booking(booking, currency=currency)
@@ -162,6 +190,260 @@ class CreatePaymentIntentAPIView(APIView):
 
 @extend_schema(
     tags=['Payments'],
+    summary="List all Session Passes",
+    responses={200: SessionPassSerializer(many=True)}
+)
+class SessionPassListAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        passes = SessionPass.objects.all().order_by('id')
+        serializer = SessionPassSerializer(passes, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    tags=['Payments'],
+    summary="List all Subscription Plans",
+    parameters=[
+        OpenApiParameter(name='plan_type', type=str, location=OpenApiParameter.QUERY, description="Filter by plan_type: weekly, unlimited"),
+        OpenApiParameter(name='plan_category', type=str, location=OpenApiParameter.QUERY, description="Filter by plan_category: sauna, saltroom"),
+    ],
+    responses={200: SubscriptionPlansSerializer(many=True)}
+)
+class SubscriptionPlanListAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        queryset = SubscriptionPlans.objects.all().order_by('id')
+        plan_type = request.query_params.get('plan_type')
+        plan_category = request.query_params.get('plan_category')
+        if plan_type:
+            queryset = queryset.filter(plan_type=plan_type)
+        if plan_category:
+            queryset = queryset.filter(plan_category=plan_category)
+        serializer = SubscriptionPlansSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    tags=['Payments'],
+    summary="List all available Plans & Passes (Session Passes and Subscription Plans combined)",
+    responses={200: OpenApiTypes.OBJECT}
+)
+class AllPlansAndPassesListAPIView(APIView):
+    """
+    Returns all session passes and subscription plans in one response so the frontend
+    can render all available pricing tiers/plans in a single request.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        passes = SessionPass.objects.all().order_by('id')
+        plans = SubscriptionPlans.objects.all().order_by('id')
+
+        return Response({
+            "session_passes": SessionPassSerializer(passes, many=True).data,
+            "subscription_plans": SubscriptionPlansSerializer(plans, many=True).data,
+        }, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    tags=['Payments'],
+    summary="Purchase a Session Pass or Subscription Plan with automatic Stripe PaymentIntent generation",
+    request=PurchaseRequestSerializer,
+    responses={
+        201: OpenApiTypes.OBJECT,
+        400: OpenApiTypes.OBJECT,
+    }
+)
+class PurchasePassOrPlanAPIView(APIView):
+    """
+    Unified API for purchasing either a Session Pass or a Subscription Plan.
+    Requires user to be logged in (IsAuthenticated).
+    Creates a ClientPurchase record associated with the user and generates a Stripe PaymentIntent.
+    Frontend can directly use `client_secret` to confirm card payment via Stripe Elements/SDK.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PurchaseRequestSerializer
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        purchase_type = data['purchase_type']
+        user = request.user
+
+        name = data.get('name') or getattr(user, 'name', '') or user.email
+        email = data.get('email') or user.email
+        phone = data.get('phone') or getattr(user, 'phone', '') or ''
+        currency = data.get('currency', 'eur').lower()
+
+        session_pass_obj = None
+        subscription_plan_obj = None
+
+        if purchase_type == 'session_pass':
+            pass_id = data.get('pass_id')
+            session_pass_obj = SessionPass.objects.filter(id=pass_id).first()
+            if not session_pass_obj:
+                return Response({"error": f"Session pass #{pass_id} not found."}, status=status.HTTP_404_NOT_FOUND)
+            price = session_pass_obj.price
+        else:
+            plan_id = data.get('plan_id')
+            subscription_plan_obj = SubscriptionPlans.objects.filter(id=plan_id).first()
+            if not subscription_plan_obj:
+                return Response({"error": f"Subscription plan #{plan_id} not found."}, status=status.HTTP_404_NOT_FOUND)
+            price = subscription_plan_obj.price
+
+        purchase = ClientPurchase.objects.create(
+            user=user,
+            purchase_type=purchase_type,
+            session_pass=session_pass_obj,
+            subscription_plan=subscription_plan_obj,
+            name=name,
+            email=email,
+            phone=phone,
+            amount=price,
+            currency=currency,
+            status='pending',
+            payment_status='pending',
+        )
+
+        client_secret = None
+        intent_id = None
+        try:
+            payment, client_secret, intent_id = create_payment_intent_for_booking(purchase, currency=currency)
+        except Exception as e:
+            print("Auto PaymentIntent creation error for purchase:", e)
+            return Response({
+                "success": False,
+                "error": f"Failed to generate payment intent: {str(e)}",
+                "purchase_id": purchase.purchase_id,
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        purchase_details = ClientPurchaseSerializer(purchase).data
+
+        item_title = session_pass_obj.name if session_pass_obj else subscription_plan_obj.name
+
+        return Response({
+            "success": True,
+            "purchase_id": purchase.purchase_id,
+            "purchase_type": purchase.purchase_type,
+            "item_name": item_title,
+            "amount": purchase.amount,
+            "currency": purchase.currency,
+            "start_date": purchase.start_date,
+            "end_date": purchase.end_date,
+            "total_sessions": purchase.total_sessions,
+            "remaining_sessions": purchase.remaining_sessions,
+            "sessions_per_week": purchase.sessions_per_week,
+            "max_active_reservations": purchase.max_active_reservations,
+            "client_secret": client_secret,
+            "payment_intent_id": intent_id,
+            "data": purchase_details,
+            "message": f"{purchase.get_purchase_type_display()} purchase initiated successfully. Proceed with Stripe payment using client_secret.",
+        }, status=status.HTTP_201_CREATED)
+
+
+class ConfirmPaymentAPIView(APIView):
+    """
+    Direct payment confirmation endpoint.
+    Frontend can call this right after stripe.confirmCardPayment succeeds to instantly verify
+    and update ClientPurchase / Booking and Payments status to 'paid' and 'confirmed'
+    without waiting for or relying on local webhooks.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        payment_intent_id = request.data.get('payment_intent_id') or request.data.get('intent_id')
+        purchase_id = request.data.get('purchase_id') or request.data.get('booking_id')
+
+        if not payment_intent_id and not purchase_id:
+            return Response(
+                {"error": "Either payment_intent_id or purchase_id/booking_id is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 1. Lookup payment record
+        payment = None
+        if payment_intent_id:
+            payment = Payments.objects.filter(stripe_payment_intent_id=payment_intent_id).first()
+        if not payment and purchase_id:
+            payment = Payments.objects.filter(booking_id=purchase_id).first()
+
+        # 2. Retrieve live status from Stripe
+        stripe_status = None
+        stripe_intent_id = payment_intent_id or (payment.stripe_payment_intent_id if payment else None)
+
+        if stripe_intent_id:
+            try:
+                pi_obj = PaymentIntent.objects.filter(id=stripe_intent_id).first()
+                if pi_obj:
+                    live_pi = pi_obj.api_retrieve()
+                    stripe_status = live_pi.get('status')
+                else:
+                    live_pi = PaymentIntent.api_retrieve(stripe_intent_id)
+                    stripe_status = live_pi.get('status')
+            except Exception as e:
+                # Direct stripe fallback if djstripe method fails
+                try:
+                    import stripe
+                    stripe.api_key = settings.STRIPE_SECRET_KEY
+                    pi_stripe = stripe.PaymentIntent.retrieve(stripe_intent_id)
+                    stripe_status = pi_stripe.get('status')
+                except Exception as ex:
+                    print("Direct Stripe verify warning:", ex)
+
+        is_paid = stripe_status in ['succeeded', 'processing']
+
+        target_id = purchase_id or (payment.booking_id if payment else None)
+
+        # 3. Update payment record
+        if payment and is_paid:
+            payment.payment_status = 'paid'
+            payment.transaction_id = stripe_intent_id
+            payment.save()
+
+        # 4. Update booking/purchase object
+        booking_obj = None
+        if target_id:
+            booking_obj = (
+                ClientPurchase.objects.filter(purchase_id=target_id).first()
+                or SaunaBooking.objects.filter(booking_id=target_id).first()
+                or ActivityBooking.objects.filter(booking_id=target_id).first()
+                or PackageBooking.objects.filter(booking_id=target_id).first()
+            )
+
+        if booking_obj:
+            if is_paid:
+                booking_obj.payment_status = 'paid'
+                booking_obj.status = 'confirmed'
+                booking_obj.save()
+                try:
+                    send_booking_confirmation_email(booking_obj)
+                except Exception as mail_err:
+                    print("Confirmation email error:", mail_err)
+
+            return Response({
+                "success": is_paid,
+                "status": booking_obj.status,
+                "payment_status": booking_obj.payment_status,
+                "purchase_id": target_id,
+                "stripe_status": stripe_status,
+                "message": "Payment verified and booking confirmed successfully." if is_paid else f"Payment status is {stripe_status}."
+            }, status=status.HTTP_200_OK if is_paid else status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            "success": is_paid,
+            "stripe_status": stripe_status,
+            "message": "Payment verified."
+        }, status=status.HTTP_200_OK if is_paid else status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema(
+    tags=['Payments'],
     summary="Payment success callback status",
     responses={200: PaymentMessageResponseSerializer}
 )
@@ -170,6 +452,48 @@ class PaymentSuccessView(APIView):
     serializer_class = PaymentMessageResponseSerializer
 
     def get(self, request):
+        ref = request.query_params.get('ref') or request.query_params.get('booking_id')
+        payment_intent_id = request.query_params.get('payment_intent') or request.query_params.get('payment_intent_id')
+
+        if ref or payment_intent_id:
+            payment = None
+            if payment_intent_id:
+                payment = Payments.objects.filter(stripe_payment_intent_id=payment_intent_id).first()
+            if not payment and ref:
+                payment = Payments.objects.filter(booking_id=ref).first()
+
+            target_id = ref or (payment.booking_id if payment else None)
+
+            # Check live stripe
+            stripe_intent_id = payment_intent_id or (payment.stripe_payment_intent_id if payment else None)
+            is_paid = True
+            if stripe_intent_id:
+                try:
+                    import stripe
+                    stripe.api_key = settings.STRIPE_SECRET_KEY
+                    pi_stripe = stripe.PaymentIntent.retrieve(stripe_intent_id)
+                    is_paid = pi_stripe.get('status') in ['succeeded', 'processing']
+                except Exception:
+                    pass
+
+            if payment and is_paid:
+                payment.payment_status = 'paid'
+                payment.transaction_id = stripe_intent_id
+                payment.save()
+
+            if target_id and is_paid:
+                booking_obj = (
+                    ClientPurchase.objects.filter(purchase_id=target_id).first()
+                    or SaunaBooking.objects.filter(booking_id=target_id).first()
+                    or ActivityBooking.objects.filter(booking_id=target_id).first()
+                    or PackageBooking.objects.filter(booking_id=target_id).first()
+                )
+                if booking_obj:
+                    booking_obj.payment_status = 'paid'
+                    booking_obj.status = 'confirmed'
+                    booking_obj.save()
+                    send_booking_confirmation_email(booking_obj)
+
         return Response({"message": "Payment successful! Your booking is confirmed."})
 
 
@@ -232,6 +556,7 @@ class StripeWebhookView(APIView):
                     SaunaBooking.objects.filter(booking_id=target_booking_id).first()
                     or ActivityBooking.objects.filter(booking_id=target_booking_id).first()
                     or PackageBooking.objects.filter(booking_id=target_booking_id).first()
+                    or ClientPurchase.objects.filter(purchase_id=target_booking_id).first()
                 )
                 if booking_obj:
                     booking_obj.payment_status = 'paid'
@@ -246,6 +571,14 @@ class StripeWebhookView(APIView):
                 if payment:
                     payment.payment_status = 'failed'
                     payment.save()
+            metadata = stripe_obj.get('metadata', {})
+            booking_id = metadata.get('booking_id') or metadata.get('booking')
+            target_booking_id = booking_id or (payment.booking_id if payment else None)
+            if target_booking_id:
+                booking_obj = ClientPurchase.objects.filter(purchase_id=target_booking_id).first()
+                if booking_obj:
+                    booking_obj.payment_status = 'failed'
+                    booking_obj.save()
 
         return HttpResponse(status=status.HTTP_200_OK)
 
@@ -274,6 +607,7 @@ def handle_djstripe_payment_succeeded(event, **kwargs):
             SaunaBooking.objects.filter(booking_id=target_booking_id).first()
             or ActivityBooking.objects.filter(booking_id=target_booking_id).first()
             or PackageBooking.objects.filter(booking_id=target_booking_id).first()
+            or ClientPurchase.objects.filter(purchase_id=target_booking_id).first()
         )
         if booking_obj:
             booking_obj.payment_status = 'paid'
@@ -286,8 +620,17 @@ def handle_djstripe_payment_succeeded(event, **kwargs):
 def handle_djstripe_payment_failed(event, **kwargs):
     payment_intent = event.data.get("object", {})
     intent_id = payment_intent.get("id")
+    metadata = payment_intent.get("metadata", {})
+    booking_id = metadata.get("booking_id") or metadata.get("booking")
+    payment = None
     if intent_id:
         payment = Payments.objects.filter(stripe_payment_intent_id=intent_id).first()
         if payment:
             payment.payment_status = 'failed'
             payment.save()
+    target_booking_id = booking_id or (payment.booking_id if payment else None)
+    if target_booking_id:
+        booking_obj = ClientPurchase.objects.filter(purchase_id=target_booking_id).first()
+        if booking_obj:
+            booking_obj.payment_status = 'failed'
+            booking_obj.save()
