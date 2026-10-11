@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, time
 from django.utils import timezone
 from .models import *
 from payments.models import SubscriptionPlans, SessionPass
-from bookings.models import SaunaBooking
+from bookings.models import SaunaBooking, LunchroomBooking, ActivityBooking, EventBooking
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -144,20 +144,21 @@ class ServiceDetailView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
-
 class GetSlotView(APIView):
     permission_classes = [AllowAny]
 
     @extend_schema(
         tags=["Services"],
-        summary="Get available slots for a service (sauna, saltroom, activity, lunchroom, event)",
+        summary="Get available slots for a service (sauna, package, lunchroom, activity, etc.)",
         parameters=[
-            OpenApiParameter(name="type", description="Service Type (e.g. sauna, private_sauna, shared_sauna)", required=False, type=str),
+            OpenApiParameter(name="type", description="Service Type: 'package', 'sauna', 'private_sauna', 'shared_sauna', 'lunchroom', 'activity'", required=False, type=str),
+            OpenApiParameter(name="sub_type", description="Optional Sub-service Type filter for packages (e.g. sauna, private_sauna, shared_sauna, lunchroom, activity)", required=False, type=str),
             OpenApiParameter(name="date", description="Date (YYYY-MM-DD)", required=True, type=str),
         ],
     )
     def get(self, request, service_type=None):
         s_type = (service_type or request.query_params.get('type') or '').lower()
+        sub_type = (request.query_params.get('sub_type') or '').lower()
         date_str = request.query_params.get('date')
 
         if not date_str:
@@ -180,16 +181,7 @@ class GetSlotView(APIView):
                 "success": False,
                 "is_blocked": True,
                 "date": date_str,
-                "data": {
-                    "private_sauna": {
-                        "available_slots": {"3_hours": [], "4_hours": []}
-                    },
-                    "shared_sauna": {
-                        "max_capacity_per_slot": 6,
-                        "slots": [],
-                        "booked_slots": []
-                    }
-                },
+                "data": {},
                 "message": "No slots available. This date is blocked."
             }, status=status.HTTP_200_OK)
 
@@ -211,7 +203,7 @@ class GetSlotView(APIView):
         close_dt = datetime.combine(target_date, close_time)
 
         # -------------------------------------------------------------
-        # PRIVATE SAUNA SLOT CALCULATION (3h/4h sessions + 30m buffer)
+        # A. PRIVATE SAUNA SLOT CALCULATION (3h/4h sessions + 30m buffer)
         # -------------------------------------------------------------
         private_bookings = SaunaBooking.objects.filter(
             booking_date=target_date,
@@ -262,7 +254,7 @@ class GetSlotView(APIView):
         private_4_hours = generate_private_slots(4)
 
         # -------------------------------------------------------------
-        # SHARED SAUNA SLOT CALCULATION (90m session + 15m buffer)
+        # B. SHARED SAUNA SLOT CALCULATION (90m session + 15m buffer)
         # -------------------------------------------------------------
         shared_sauna_model = SharedSauna.objects.first()
         shared_max_capacity = shared_sauna_model.max_person if shared_sauna_model else 6
@@ -271,21 +263,6 @@ class GetSlotView(APIView):
             booking_date=target_date,
             sauna_type='shared'
         ).exclude(status='cancelled')
-
-        shared_booked_slots_list = []
-        for sb in shared_bookings:
-            sb_start = datetime.combine(target_date, sb.booking_time)
-            sb_session_end = sb_start + timedelta(minutes=90)
-            sb_buffer_end = sb_start + timedelta(minutes=105)
-
-            shared_booked_slots_list.append({
-                "booking_id": sb.booking_id,
-                "name": sb.name,
-                "start_time": sb_start.strftime("%H:%M"),
-                "session_end_time": sb_session_end.strftime("%H:%M"),
-                "buffer_end_time": sb_buffer_end.strftime("%H:%M"),
-                "capacity": sb.capacity,
-            })
 
         def generate_shared_slots():
             session_td = timedelta(minutes=90)
@@ -327,24 +304,90 @@ class GetSlotView(APIView):
 
         shared_slots = generate_shared_slots()
 
+        # -------------------------------------------------------------
+        # C. LUNCHROOM AVAILABILITY INFO (Flexible time within open hours)
+        # -------------------------------------------------------------
+        lunch_bookings_count = LunchroomBooking.objects.filter(
+            booking_date=target_date
+        ).exclude(status='cancelled').count()
+
+        lunchroom_data = {
+            "is_available": True,
+            "open_time": open_time.strftime("%H:%M"),
+            "close_time": close_time.strftime("%H:%M"),
+            "existing_bookings_count": lunch_bookings_count,
+            "info": "Lunchroom accommodates flexible dining during opening hours. Choose any preferred arrival time."
+        }
+
+        # -------------------------------------------------------------
+        # D. ACTIVITIES AVAILABILITY FOR THE DATE
+        # -------------------------------------------------------------
+        activities_on_date = Activities.objects.prefetch_related('features').filter(
+            date=target_date,
+            is_available=True
+        ).order_by('open_time')
+        activities_serializer = ActivitiesSerializer(activities_on_date, many=True, context={'request': request})
+
+        # -------------------------------------------------------------
+        # Construct Response by Service Type / Package
+        # -------------------------------------------------------------
+        data = {}
+
+        is_package = s_type in ['package', 'packages']
+
+        # Sauna data
+        sauna_dict = {
+            "private_sauna": {
+                "slots": {
+                    "3_hours": private_3_hours,
+                    "4_hours": private_4_hours
+                }
+            },
+            "shared_sauna": {
+                "max_capacity_per_slot": shared_max_capacity,
+                "slots": shared_slots,
+            }
+        }
+
+        if is_package:
+            # Package slots: Include all sub-services or filtered sub_type
+            if sub_type in ['private_sauna']:
+                data["private_sauna"] = sauna_dict["private_sauna"]
+            elif sub_type in ['shared_sauna']:
+                data["shared_sauna"] = sauna_dict["shared_sauna"]
+            elif sub_type in ['sauna']:
+                data["sauna"] = sauna_dict
+            elif sub_type in ['lunchroom']:
+                data["lunchroom"] = lunchroom_data
+            elif sub_type in ['activity', 'activities']:
+                data["activities"] = activities_serializer.data
+            else:
+                # Return combined package slots for all sub-services
+                data["sauna"] = sauna_dict
+                data["lunchroom"] = lunchroom_data
+                data["activities"] = activities_serializer.data
+        elif s_type in ['lunchroom']:
+            data = lunchroom_data
+        elif s_type in ['activity', 'activities']:
+            data = {
+                "activities": activities_serializer.data
+            }
+        elif s_type in ['private_sauna']:
+            data = {"private_sauna": sauna_dict["private_sauna"]}
+        elif s_type in ['shared_sauna']:
+            data = {"shared_sauna": sauna_dict["shared_sauna"]}
+        else:
+            # Default / sauna
+            data = sauna_dict
+
         return Response({
             "success": True,
             "is_blocked": False,
             "date": date_str,
+            "service_type": s_type or "sauna",
             "open_time": open_time.strftime("%H:%M"),
             "close_time": close_time.strftime("%H:%M"),
-            "data": {
-                "private_sauna": {
-                    "slots": {
-                        "3_hours": private_3_hours,
-                        "4_hours": private_4_hours
-                    }
-                },
-                "shared_sauna": {
-                    "max_capacity_per_slot": shared_max_capacity,
-                    "slots": shared_slots,
-                }
-            },
+            "data": data,
             "message": "Available Slots",
         }, status=status.HTTP_200_OK)
 

@@ -4,6 +4,7 @@ from .views import (
     LunchroomBookingAPIView,
     ActivityBookingAPIView,
     EventBookingAPIView,
+    PackageBookingAPIView,
 )
 
 urlpatterns = [
@@ -15,4 +16,6 @@ urlpatterns = [
     path('activities/confirm/', ActivityBookingAPIView.as_view(), name='activity-booking-confirm'),
     path('events/', EventBookingAPIView.as_view(), name='event-booking'),
     path('events/confirm/', EventBookingAPIView.as_view(), name='event-booking-confirm'),
+    path('packages/', PackageBookingAPIView.as_view(), name='package-booking'),
+    path('packages/confirm/', PackageBookingAPIView.as_view(), name='package-booking-confirm'),
 ]

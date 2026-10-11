@@ -47,7 +47,7 @@ class SaltroomFeaturesTranslationOptions(TranslationOptions):
 
 @register(Packages)
 class PackagesTranslationOptions(TranslationOptions):
-    fields = ('title', 'packages', 'description')
+    fields = ('title', 'description')
 
 @register(PackageFeatures)
 class PackageFeaturesTranslationOptions(TranslationOptions):

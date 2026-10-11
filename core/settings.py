@@ -36,7 +36,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:5173',
-    'https://crafty-rally-enjoyment.ngrok-free.dev',
+    'https://raju.loca.lt',
 ]
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")

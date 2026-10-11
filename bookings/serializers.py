@@ -1,5 +1,109 @@
 from rest_framework import serializers
-from .models import SaunaBooking, LunchroomBooking, ActivityBooking, EventBooking
+from .models import SaunaBooking, LunchroomBooking, ActivityBooking, EventBooking, PackageBooking
+
+
+class PackageBookingSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(required=True, help_text="Guest Name (Required)")
+    email = serializers.EmailField(required=True, help_text="Guest Email (Required)")
+    phone = serializers.CharField(required=True, help_text="Guest Phone Number (Required)")
+    date = serializers.DateField(required=True, help_text="Package Date (YYYY-MM-DD)")
+    guests = serializers.IntegerField(required=False, default=1, help_text="Number of guests")
+    booked_services_ids = serializers.JSONField(
+        required=False,
+        default=list,
+        help_text="List of sub-service IDs, e.g. [{'private_sauna':'PS-001'}, {'lunchroom':'LR-001'}] or ['PS-001', 'ACT-002']"
+    )
+    service_names = serializers.JSONField(
+        required=False,
+        default=list,
+        help_text=(
+            "For CUSTOM packages only: list of selected service names, "
+            "e.g. ['Private Sauna', 'Lunchroom', 'Yoga Activity']. "
+            "These are stored as-is and no sub-bookings are created."
+        )
+    )
+    is_custom = serializers.BooleanField(required=False, default=False)
+    notes = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+
+    class Meta:
+        model = PackageBooking
+        fields = '__all__'
+        read_only_fields = ['id', 'booking_id', 'user', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            validated_data['user'] = request.user
+
+        is_custom = validated_data.get('is_custom', False)
+
+        if is_custom:
+            # Custom package: NO sub-bookings created, NO payment.
+            # Just store service names in the service_names JSON field.
+            service_names = validated_data.get('service_names', [])
+            if not isinstance(service_names, list):
+                service_names = []
+            validated_data['service_names'] = service_names
+            validated_data['booked_services_ids'] = []  # empty for custom
+            return super().create(validated_data)
+
+        # --- Standard package: create sub-bookings ---
+        sauna_data = self.initial_data.get('sauna_booking') or self.initial_data.get('sauna')
+        lunchroom_data = self.initial_data.get('lunchroom_booking') or self.initial_data.get('lunchroom')
+        activity_data = self.initial_data.get('activity_booking') or self.initial_data.get('activity')
+
+        booked_services_ids = validated_data.get('booked_services_ids', [])
+        if not isinstance(booked_services_ids, list):
+            booked_services_ids = []
+
+        # 1. Create Sauna Booking if sauna_data provided
+        if sauna_data and isinstance(sauna_data, dict):
+            from .serializers import SaunaBookingSerializer
+            s_data = dict(sauna_data)
+            s_data.setdefault('name', validated_data.get('name'))
+            s_data.setdefault('email', validated_data.get('email'))
+            s_data.setdefault('phone', validated_data.get('phone'))
+            s_data.setdefault('booking_date', str(validated_data.get('date')))
+            s_data.setdefault('booking_time', '10:00:00')
+            s_serializer = SaunaBookingSerializer(data=s_data, context=self.context)
+            if s_serializer.is_valid(raise_exception=True):
+                s_booking = s_serializer.save()
+                raw_stype = s_data.get('sauna_type', 'sauna')
+                if raw_stype in ['private', 'shared']:
+                    stype = f"{raw_stype}_sauna"
+                else:
+                    stype = raw_stype
+                booked_services_ids.append({stype: s_booking.booking_id})
+
+        # 2. Create Lunchroom Booking if lunchroom_data provided
+        if lunchroom_data and isinstance(lunchroom_data, dict):
+            from .serializers import LunchroomBookingSerializer
+            l_data = dict(lunchroom_data)
+            l_data.setdefault('name', validated_data.get('name'))
+            l_data.setdefault('email', validated_data.get('email'))
+            l_data.setdefault('phone', validated_data.get('phone'))
+            l_data.setdefault('booking_date', str(validated_data.get('date')))
+            l_data.setdefault('booking_time', '12:00:00')
+            l_serializer = LunchroomBookingSerializer(data=l_data, context=self.context)
+            if l_serializer.is_valid(raise_exception=True):
+                l_booking = l_serializer.save()
+                booked_services_ids.append({'lunchroom': l_booking.booking_id})
+
+        # 3. Create Activity Booking if activity_data provided
+        if activity_data and isinstance(activity_data, dict):
+            from .serializers import ActivityBookingSerializer
+            a_data = dict(activity_data)
+            a_data.setdefault('name', validated_data.get('name'))
+            a_data.setdefault('email', validated_data.get('email'))
+            a_data.setdefault('phone', validated_data.get('phone'))
+            a_serializer = ActivityBookingSerializer(data=a_data, context=self.context)
+            if a_serializer.is_valid(raise_exception=True):
+                a_booking = a_serializer.save()
+                booked_services_ids.append({'activity': a_booking.booking_id})
+
+        validated_data['booked_services_ids'] = booked_services_ids
+        return super().create(validated_data)
+
 
 
 class SaunaBookingSerializer(serializers.ModelSerializer):

@@ -95,6 +95,53 @@ def send_booking_confirmation_email(booking):
             booking_date_display = str(booking.booking_date)
             booking_time_display = str(booking.booking_time)
             time_slot_display = booking.get_time_slot_display() if hasattr(booking, 'get_time_slot_display') else str(getattr(booking, 'time_slot', ''))
+        elif hasattr(booking, 'booked_services_ids') or (hasattr(booking, 'booking_id') and booking.booking_id.startswith('PKG-')):
+            booking_type_display = 'Package Booking' if not getattr(booking, 'is_custom', False) else 'Custom Package Request'
+            booking_date_display = str(booking.date)
+            booking_time_display = "Scheduled Services"
+            time_slot_display = ""
+            
+            from bookings.models import SaunaBooking, LunchroomBooking, ActivityBooking
+
+            # Extract human-readable summary of included sub-services with time & full title
+            services_summary = []
+            raw_ids = getattr(booking, 'booked_services_ids', []) or []
+            for item in raw_ids:
+                if isinstance(item, dict):
+                    for service_type, ref_id in item.items():
+                        # Map service_type key to proper full name
+                        if service_type in ['private', 'private_sauna']:
+                            service_title = 'Private Sauna'
+                        elif service_type in ['shared', 'shared_sauna']:
+                            service_title = 'Shared Sauna'
+                        elif service_type == 'lunchroom':
+                            service_title = 'Lunchroom'
+                        elif service_type == 'activity':
+                            service_title = 'Activity'
+                        else:
+                            service_title = str(service_type).replace('_', ' ').title()
+
+                        # Lookup time from DB object
+                        time_str = ""
+                        if ref_id.startswith(('PS-', 'SS-')):
+                            s_obj = SaunaBooking.objects.filter(booking_id=ref_id).first()
+                            if s_obj and s_obj.booking_time:
+                                time_str = f" @ {s_obj.booking_time.strftime('%H:%M')}"
+                        elif ref_id.startswith('LR-'):
+                            l_obj = LunchroomBooking.objects.filter(booking_id=ref_id).first()
+                            if l_obj and l_obj.booking_time:
+                                time_str = f" @ {l_obj.booking_time.strftime('%H:%M')}"
+                        elif ref_id.startswith('ACT-'):
+                            a_obj = ActivityBooking.objects.filter(booking_id=ref_id).first()
+                            if a_obj and a_obj.activity and a_obj.activity.open_time:
+                                time_str = f" @ {a_obj.activity.open_time.strftime('%H:%M')}"
+
+                        services_summary.append(f"{service_title} (ID: {ref_id}{time_str})")
+                elif isinstance(item, str):
+                    services_summary.append(item)
+
+            if services_summary:
+                booking_time_display = ", ".join(services_summary)
         elif hasattr(booking, 'guests') and hasattr(booking, 'start_time'):
             booking_type_display = 'Event Booking'
             booking_date_display = str(booking.date)

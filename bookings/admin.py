@@ -1,6 +1,13 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
-from .models import SaunaBooking, LunchroomBooking, ActivityBooking, EventBooking
+from .models import SaunaBooking, LunchroomBooking, ActivityBooking, EventBooking, PackageBooking
+
+
+@admin.register(PackageBooking)
+class PackageBookingAdmin(ModelAdmin):
+    list_display = ['booking_id', 'name', 'email', 'phone', 'date', 'guests', 'is_custom', 'total_price', 'status', 'payment_status', 'created_at']
+    list_filter = ['status', 'payment_status', 'is_custom', 'date']
+    search_fields = ['booking_id', 'name', 'email', 'phone']
 
 
 @admin.register(SaunaBooking)

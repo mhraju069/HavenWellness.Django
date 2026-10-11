@@ -140,8 +140,15 @@ class SaltroomFeatures(models.Model):
 
 
 class Packages(models.Model):
+    PACKAGE_TYPE_CHOICES = [
+        ('private_sauna', 'Private Sauna'),
+        ('shared_sauna', 'Shared Sauna'),
+        ('saltroom', 'Saltroom'),
+        ('activity', 'Activity'),
+        ('lunchroom', 'Lunchroom'),
+    ]
     title = models.CharField(max_length=100)
-    packages = models.CharField(max_length=100)
+    packages = models.JSONField(default=list, blank=True, help_text="List of included service types, e.g. ['private_sauna', 'lunchroom']")
     description = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     image = models.ImageField(upload_to="package", null=True, blank=True)

@@ -12,7 +12,7 @@ from djstripe.models import PaymentIntent, Customer, Subscription, Event
 
 from .helper import send_booking_confirmation_email
 from .models import Payments
-from bookings.models import SaunaBooking, ActivityBooking
+from bookings.models import SaunaBooking, ActivityBooking, PackageBooking
 from .serializers import (
     PaymentsSerializer,
     CreatePaymentIntentRequestSerializer,
@@ -28,7 +28,10 @@ def create_payment_intent_for_booking(booking, currency="eur"):
         return None, None, None
 
     # Detect booking type
-    if hasattr(booking, 'activity') or booking.booking_id.startswith('ACT-'):
+    if hasattr(booking, 'booked_services_ids') or booking.booking_id.startswith('PKG-'):
+        booking_type_val = 'package'
+        booking_label = 'Package'
+    elif hasattr(booking, 'activity') or booking.booking_id.startswith('ACT-'):
         booking_type_val = 'activities'
         booking_label = 'Activity'
     elif hasattr(booking, 'celebration_type') or booking.booking_id.startswith('LR-'):
@@ -228,6 +231,7 @@ class StripeWebhookView(APIView):
                 booking_obj = (
                     SaunaBooking.objects.filter(booking_id=target_booking_id).first()
                     or ActivityBooking.objects.filter(booking_id=target_booking_id).first()
+                    or PackageBooking.objects.filter(booking_id=target_booking_id).first()
                 )
                 if booking_obj:
                     booking_obj.payment_status = 'paid'
@@ -269,6 +273,7 @@ def handle_djstripe_payment_succeeded(event, **kwargs):
         booking_obj = (
             SaunaBooking.objects.filter(booking_id=target_booking_id).first()
             or ActivityBooking.objects.filter(booking_id=target_booking_id).first()
+            or PackageBooking.objects.filter(booking_id=target_booking_id).first()
         )
         if booking_obj:
             booking_obj.payment_status = 'paid'
