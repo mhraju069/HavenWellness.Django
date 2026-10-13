@@ -10,6 +10,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import PaymentIntent, Customer, Subscription, Event
 
+from django.contrib.auth import get_user_model
 from .helper import send_booking_confirmation_email
 from .models import Payments, ClientPurchase, SessionPass, SubscriptionPlans
 from bookings.models import SaunaBooking, ActivityBooking, PackageBooking, SaltRoomBooking
@@ -23,6 +24,18 @@ from .serializers import (
     PurchaseRequestSerializer,
     ClientPurchaseSerializer,
 )
+
+User = get_user_model()
+
+
+def resolve_user_for_booking(booking=None, email=None):
+    if booking and getattr(booking, 'user', None):
+        return booking.user
+    target_email = email or (getattr(booking, 'email', None) if booking else None)
+    if target_email:
+        return User.objects.filter(email__iexact=str(target_email).strip()).first()
+    return None
+
 
 
 def create_payment_intent_for_booking(booking, currency="eur", payment_method=None):
@@ -122,11 +135,19 @@ def create_payment_intent_for_booking(booking, currency="eur", payment_method=No
     intent_id = intent_stripe_obj.id
     client_secret = getattr(intent_stripe_obj, 'client_secret', '')
 
+    resolved_user = resolve_user_for_booking(booking=booking, email=getattr(booking, 'email', None))
+    if resolved_user and not getattr(booking, 'user', None):
+        booking.user = resolved_user
+        try:
+            booking.save(update_fields=['user'])
+        except Exception:
+            pass
+
     payment, created = Payments.objects.get_or_create(
         booking_id=booking.booking_id,
         defaults={
             'booking_type': booking_type_val,
-            'client': booking.user if booking.user else None,
+            'client': resolved_user,
             'amount': booking.total_price,
             'currency': currency.lower(),
             'payment_status': 'pending',
@@ -136,8 +157,8 @@ def create_payment_intent_for_booking(booking, currency="eur", payment_method=No
     )
     if not created:
         payment.booking_type = booking_type_val
-        if booking.user:
-            payment.client = booking.user
+        if resolved_user and not payment.client:
+            payment.client = resolved_user
         payment.amount = booking.total_price
         payment.currency = currency.lower()
         payment.stripe_payment_intent_id = intent_id
@@ -367,6 +388,23 @@ class PurchasePassOrPlanAPIView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 
+@extend_schema(
+    tags=['Payments'],
+    summary="List all purchases for the authenticated user",
+    responses={200: ClientPurchaseSerializer(many=True)}
+)
+class UserPurchasesAPIView(APIView):
+    """
+    Returns all session pass and subscription purchases for the current user.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        purchases = ClientPurchase.objects.filter(user=user).order_by('-created_at')
+        return Response(ClientPurchaseSerializer(purchases, many=True).data, status=status.HTTP_200_OK)
+
+
 def confirm_package_sub_bookings(package_booking):
     """
     When a PackageBooking is marked as paid/confirmed, also confirm and mark as paid
@@ -375,33 +413,31 @@ def confirm_package_sub_bookings(package_booking):
     from bookings.models import SaunaBooking, LunchroomBooking, ActivityBooking, SaltRoomBooking
     raw_ids = package_booking.booked_services_ids or []
     pkg_amount = package_booking.total_price or 0
+    pkg_user = getattr(package_booking, 'user', None) or resolve_user_for_booking(booking=package_booking)
     for item in raw_ids:
         if isinstance(item, dict):
             for s_type, ref_id in item.items():
                 try:
+                    update_kwargs = {
+                        'status': 'confirmed',
+                        'payment_status': 'paid_with_package',
+                        'total_price': pkg_amount
+                    }
+                    if pkg_user:
+                        update_kwargs['user'] = pkg_user
+
                     if ref_id.startswith('SR-'):
-                        SaltRoomBooking.objects.filter(booking_id=ref_id).update(
-                            status='confirmed',
-                            payment_status='paid_with_package',
-                            is_paid=True,
-                            total_price=pkg_amount
-                        )
+                        update_kwargs['is_paid'] = True
+                        SaltRoomBooking.objects.filter(booking_id=ref_id).update(**update_kwargs)
                     elif ref_id.startswith(('PS-', 'SS-', 'SB-')):
-                        SaunaBooking.objects.filter(booking_id=ref_id).update(
-                            status='confirmed',
-                            payment_status='paid_with_package',
-                            total_price=pkg_amount
-                        )
+                        SaunaBooking.objects.filter(booking_id=ref_id).update(**update_kwargs)
                     elif ref_id.startswith('LR-'):
-                        LunchroomBooking.objects.filter(booking_id=ref_id).update(
-                            status='confirmed_with_package'
-                        )
+                        lr_kwargs = {'status': 'confirmed_with_package'}
+                        if pkg_user:
+                            lr_kwargs['user'] = pkg_user
+                        LunchroomBooking.objects.filter(booking_id=ref_id).update(**lr_kwargs)
                     elif ref_id.startswith('ACT-'):
-                        ActivityBooking.objects.filter(booking_id=ref_id).update(
-                            status='confirmed',
-                            payment_status='paid_with_package',
-                            total_price=pkg_amount
-                        )
+                        ActivityBooking.objects.filter(booking_id=ref_id).update(**update_kwargs)
                 except Exception as sub_err:
                     print(f"Warning updating sub-booking {ref_id}:", sub_err)
 
@@ -477,6 +513,13 @@ class ConfirmPaymentAPIView(APIView):
             )
 
         if booking_obj:
+            resolved_user = resolve_user_for_booking(booking=booking_obj)
+            if resolved_user and not getattr(booking_obj, 'user', None):
+                booking_obj.user = resolved_user
+            if payment and resolved_user and not payment.client:
+                payment.client = resolved_user
+                payment.save(update_fields=['client'])
+
             if is_paid:
                 booking_obj.payment_status = 'paid'
                 booking_obj.status = 'confirmed'
@@ -588,8 +631,17 @@ class PaymentSuccessView(APIView):
                     or PackageBooking.objects.filter(booking_id=target_id).first()
                 )
                 if booking_obj:
+                    resolved_user = resolve_user_for_booking(booking=booking_obj)
+                    if resolved_user and not getattr(booking_obj, 'user', None):
+                        booking_obj.user = resolved_user
+                    if payment and resolved_user and not payment.client:
+                        payment.client = resolved_user
+                        payment.save(update_fields=['client'])
+
                     booking_obj.payment_status = 'paid'
                     booking_obj.status = 'confirmed'
+                    if hasattr(booking_obj, 'is_paid'):
+                        booking_obj.is_paid = True
                     booking_obj.save()
                     if isinstance(booking_obj, PackageBooking):
                         confirm_package_sub_bookings(booking_obj)
@@ -661,6 +713,13 @@ class StripeWebhookView(APIView):
                     or ClientPurchase.objects.filter(purchase_id=target_booking_id).first()
                 )
                 if booking_obj:
+                    resolved_user = resolve_user_for_booking(booking=booking_obj)
+                    if resolved_user and not getattr(booking_obj, 'user', None):
+                        booking_obj.user = resolved_user
+                    if payment and resolved_user and not payment.client:
+                        payment.client = resolved_user
+                        payment.save(update_fields=['client'])
+
                     booking_obj.payment_status = 'paid'
                     booking_obj.status = 'confirmed'
                     if hasattr(booking_obj, 'is_paid'):
@@ -750,11 +809,21 @@ def handle_djstripe_payment_succeeded(event, **kwargs):
             or ClientPurchase.objects.filter(purchase_id=target_booking_id).first()
         )
         if booking_obj:
+            resolved_user = resolve_user_for_booking(booking=booking_obj)
+            if resolved_user and not getattr(booking_obj, 'user', None):
+                booking_obj.user = resolved_user
+            if payment and resolved_user and not payment.client:
+                payment.client = resolved_user
+                payment.save(update_fields=['client'])
+
             booking_obj.payment_status = 'paid'
             booking_obj.status = 'confirmed'
             if hasattr(booking_obj, 'is_paid'):
                 booking_obj.is_paid = True
             booking_obj.save()
+
+            if isinstance(booking_obj, PackageBooking):
+                confirm_package_sub_bookings(booking_obj)
 
             if isinstance(booking_obj, ClientPurchase):
                 linked_sr = SaltRoomBooking.objects.filter(client_purchase=booking_obj, payment_status='pending').first()

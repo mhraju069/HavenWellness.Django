@@ -7,9 +7,11 @@ from .views import (
     PackageBookingAPIView,
     SaltRoomBookingAPIView,
     BookingDetailAPIView,
+    UserBookingsAPIView,
 )
 
 urlpatterns = [
+    path('my-bookings/', UserBookingsAPIView.as_view(), name='my-bookings'),
     path('sauna/', SaunaBookingAPIView.as_view(), name='sauna-booking'),
     path('sauna/confirm/', SaunaBookingAPIView.as_view(), name='sauna-booking-confirm'),
     path('saltroom/', SaltRoomBookingAPIView.as_view(), name='saltroom-booking'),

@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiTypes
 
 from .models import SaunaBooking, LunchroomBooking, ActivityBooking, EventBooking, PackageBooking, SaltRoomBooking
 from .serializers import (
@@ -269,6 +269,10 @@ class SaltRoomBookingAPIView(generics.ListCreateAPIView):
                 payment_mode = 'pass'
 
         user = request.user if request.user and request.user.is_authenticated else None
+        if not user and (data.get('email') or raw_data.get('email')):
+            from django.contrib.auth import get_user_model
+            target_email = data.get('email') or raw_data.get('email')
+            user = get_user_model().objects.filter(email__iexact=str(target_email).strip()).first()
 
         date = data['date']
         start_time = data['start_time']
@@ -774,4 +778,39 @@ class BookingDetailAPIView(APIView):
             "payment_status": getattr(booking, 'payment_status', None),
             "is_paid": getattr(booking, 'is_paid', False),
             "data": serializer.data
+        }, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    tags=['Bookings'],
+    summary="List all bookings of all types for the authenticated user",
+    responses={200: OpenApiTypes.OBJECT}
+)
+class UserBookingsAPIView(APIView):
+    """
+    Returns all bookings across Sauna, Saltroom, Lunchroom, Activity, Package, and Event
+    belonging to the authenticated user.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        email = user.email
+
+        from django.db.models import Q
+
+        sauna_bookings = SaunaBooking.objects.filter(Q(user=user) | Q(email__iexact=email)).order_by('-created_at')
+        saltroom_bookings = SaltRoomBooking.objects.filter(Q(user=user) | Q(email__iexact=email)).order_by('-created_at')
+        lunchroom_bookings = LunchroomBooking.objects.filter(Q(user=user) | Q(email__iexact=email)).order_by('-created_at')
+        activity_bookings = ActivityBooking.objects.filter(Q(user=user) | Q(email__iexact=email)).order_by('-created_at')
+        package_bookings = PackageBooking.objects.filter(Q(user=user) | Q(email__iexact=email)).order_by('-created_at')
+        event_bookings = EventBooking.objects.filter(Q(user=user) | Q(email__iexact=email)).order_by('-created_at')
+
+        return Response({
+            "sauna": SaunaBookingSerializer(sauna_bookings, many=True).data,
+            "saltroom": SaltRoomBookingSerializer(saltroom_bookings, many=True).data,
+            "lunchroom": LunchroomBookingSerializer(lunchroom_bookings, many=True).data,
+            "activities": ActivityBookingSerializer(activity_bookings, many=True).data,
+            "packages": PackageBookingSerializer(package_bookings, many=True).data,
+            "events": EventBookingSerializer(event_bookings, many=True).data,
         }, status=status.HTTP_200_OK)

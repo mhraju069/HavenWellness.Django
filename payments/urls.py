@@ -9,9 +9,11 @@ from .views import (
     SubscriptionPlanListAPIView,
     AllPlansAndPassesListAPIView,
     PurchasePassOrPlanAPIView,
+    UserPurchasesAPIView,
 )
 
 urlpatterns = [
+    path('my-purchases/', UserPurchasesAPIView.as_view(), name='my_purchases'),
     path('plans-and-passes/', AllPlansAndPassesListAPIView.as_view(), name='all_plans_and_passes_list'),
     path('session-passes/', SessionPassListAPIView.as_view(), name='session_passes_list'),
     path('subscription-plans/', SubscriptionPlanListAPIView.as_view(), name='subscription_plans_list'),

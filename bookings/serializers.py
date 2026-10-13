@@ -1,5 +1,16 @@
 from rest_framework import serializers
+from django.contrib.auth import get_user_model
 from .models import SaunaBooking, LunchroomBooking, ActivityBooking, EventBooking, PackageBooking, SaltRoomBooking
+
+User = get_user_model()
+
+
+def resolve_booking_user(request=None, email=None):
+    if request and getattr(request, 'user', None) and request.user.is_authenticated:
+        return request.user
+    if email:
+        return User.objects.filter(email__iexact=str(email).strip()).first()
+    return None
 
 
 class PackageBookingSerializer(serializers.ModelSerializer):
@@ -98,8 +109,9 @@ class PackageBookingSerializer(serializers.ModelSerializer):
         from services.models import Saltroom
 
         request = self.context.get('request')
-        if request and request.user and request.user.is_authenticated:
-            validated_data['user'] = request.user
+        user = resolve_booking_user(request=request, email=validated_data.get('email'))
+        if user:
+            validated_data['user'] = user
 
         is_custom = validated_data.get('is_custom', False)
 
@@ -293,8 +305,9 @@ class SaunaBookingSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request = self.context.get('request')
-        if request and request.user and request.user.is_authenticated:
-            validated_data['user'] = request.user
+        user = resolve_booking_user(request=request, email=validated_data.get('email'))
+        if user:
+            validated_data['user'] = user
         return super().create(validated_data)
 
 
@@ -317,8 +330,9 @@ class LunchroomBookingSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request = self.context.get('request')
-        if request and request.user and request.user.is_authenticated:
-            validated_data['user'] = request.user
+        user = resolve_booking_user(request=request, email=validated_data.get('email'))
+        if user:
+            validated_data['user'] = user
         return super().create(validated_data)
 
 
@@ -349,8 +363,9 @@ class ActivityBookingSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request = self.context.get('request')
-        if request and request.user and request.user.is_authenticated:
-            validated_data['user'] = request.user
+        user = resolve_booking_user(request=request, email=validated_data.get('email'))
+        if user:
+            validated_data['user'] = user
 
         # Auto calculate total_price if zero or not provided: activity.price * capacity
         activity = validated_data.get('activity')
@@ -383,8 +398,9 @@ class EventBookingSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request = self.context.get('request')
-        if request and request.user and request.user.is_authenticated:
-            validated_data['user'] = request.user
+        user = resolve_booking_user(request=request, email=validated_data.get('email'))
+        if user:
+            validated_data['user'] = user
         return super().create(validated_data)
 
 
@@ -483,8 +499,9 @@ class SaltRoomBookingSerializer(serializers.ModelSerializer):
         from services.models import Saltroom
 
         request = self.context.get('request')
-        if request and request.user and request.user.is_authenticated:
-            validated_data['user'] = request.user
+        user = resolve_booking_user(request=request, email=validated_data.get('email'))
+        if user:
+            validated_data['user'] = user
 
         # Pop write-only non-model fields before creating SaltRoomBooking
         for f in [
