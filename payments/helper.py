@@ -114,6 +114,8 @@ def send_booking_confirmation_email(booking):
                             service_title = 'Private Sauna'
                         elif service_type in ['shared', 'shared_sauna']:
                             service_title = 'Shared Sauna'
+                        elif service_type in ['saltroom', 'salt_room']:
+                            service_title = 'Salt Room'
                         elif service_type == 'lunchroom':
                             service_title = 'Lunchroom'
                         elif service_type == 'activity':
@@ -123,10 +125,16 @@ def send_booking_confirmation_email(booking):
 
                         # Lookup time from DB object
                         time_str = ""
-                        if ref_id.startswith(('PS-', 'SS-')):
+                        if ref_id.startswith(('PS-', 'SS-', 'SB-')):
                             s_obj = SaunaBooking.objects.filter(booking_id=ref_id).first()
                             if s_obj and s_obj.booking_time:
                                 time_str = f" @ {s_obj.booking_time.strftime('%H:%M')}"
+                        elif ref_id.startswith('SR-'):
+                            from bookings.models import SaltRoomBooking
+                            sr_obj = SaltRoomBooking.objects.filter(booking_id=ref_id).first()
+                            if sr_obj and sr_obj.start_time:
+                                end_str = f" - {sr_obj.end_time.strftime('%H:%M')}" if sr_obj.end_time else ""
+                                time_str = f" @ {sr_obj.start_time.strftime('%H:%M')}{end_str}"
                         elif ref_id.startswith('LR-'):
                             l_obj = LunchroomBooking.objects.filter(booking_id=ref_id).first()
                             if l_obj and l_obj.booking_time:

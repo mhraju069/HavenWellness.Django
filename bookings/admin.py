@@ -38,4 +38,8 @@ class EventBookingAdmin(ModelAdmin):
     search_fields = ['booking_id', 'name', 'email', 'phone']
 
 
-admin.site.register(SaltRoomBooking, ModelAdmin)
+@admin.register(SaltRoomBooking)
+class SaltRoomBookingAdmin(ModelAdmin):
+    list_display = ['booking_id', 'name', 'email', 'phone', 'date', 'start_time', 'end_time', 'capacity', 'total_price', 'status', 'payment_status', 'is_paid', 'created_at']
+    list_filter = ['status', 'payment_status', 'is_paid', 'date']
+    search_fields = ['booking_id', 'name', 'email', 'phone']

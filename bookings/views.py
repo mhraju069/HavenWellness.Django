@@ -717,7 +717,7 @@ class BookingDetailAPIView(APIView):
             booking = SaltRoomBooking.objects.filter(booking_id__iexact=booking_id).first()
             if booking:
                 serializer = SaltRoomBookingSerializer(booking)
-        elif prefix == 'SB' or booking_id.startswith('SB-'):
+        elif prefix in ['SB', 'PS', 'SS'] or booking_id.startswith(('SB-', 'PS-', 'SS-')):
             booking = SaunaBooking.objects.filter(booking_id__iexact=booking_id).first()
             if booking:
                 serializer = SaunaBookingSerializer(booking)

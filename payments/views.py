@@ -367,6 +367,45 @@ class PurchasePassOrPlanAPIView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 
+def confirm_package_sub_bookings(package_booking):
+    """
+    When a PackageBooking is marked as paid/confirmed, also confirm and mark as paid
+    all the included sub-bookings (SaltRoom, Sauna, Lunchroom, Activity).
+    """
+    from bookings.models import SaunaBooking, LunchroomBooking, ActivityBooking, SaltRoomBooking
+    raw_ids = package_booking.booked_services_ids or []
+    pkg_amount = package_booking.total_price or 0
+    for item in raw_ids:
+        if isinstance(item, dict):
+            for s_type, ref_id in item.items():
+                try:
+                    if ref_id.startswith('SR-'):
+                        SaltRoomBooking.objects.filter(booking_id=ref_id).update(
+                            status='confirmed',
+                            payment_status='paid_with_package',
+                            is_paid=True,
+                            total_price=pkg_amount
+                        )
+                    elif ref_id.startswith(('PS-', 'SS-', 'SB-')):
+                        SaunaBooking.objects.filter(booking_id=ref_id).update(
+                            status='confirmed',
+                            payment_status='paid_with_package',
+                            total_price=pkg_amount
+                        )
+                    elif ref_id.startswith('LR-'):
+                        LunchroomBooking.objects.filter(booking_id=ref_id).update(
+                            status='confirmed_with_package'
+                        )
+                    elif ref_id.startswith('ACT-'):
+                        ActivityBooking.objects.filter(booking_id=ref_id).update(
+                            status='confirmed',
+                            payment_status='paid_with_package',
+                            total_price=pkg_amount
+                        )
+                except Exception as sub_err:
+                    print(f"Warning updating sub-booking {ref_id}:", sub_err)
+
+
 class ConfirmPaymentAPIView(APIView):
     """
     Direct payment confirmation endpoint.
@@ -477,6 +516,9 @@ class ConfirmPaymentAPIView(APIView):
                             cp.remaining_sessions = max(0, cp.remaining_sessions - 1)
                         cp.save()
 
+                elif isinstance(booking_obj, PackageBooking):
+                    confirm_package_sub_bookings(booking_obj)
+
                 try:
                     send_booking_confirmation_email(booking_obj)
                 except Exception as mail_err:
@@ -549,6 +591,8 @@ class PaymentSuccessView(APIView):
                     booking_obj.payment_status = 'paid'
                     booking_obj.status = 'confirmed'
                     booking_obj.save()
+                    if isinstance(booking_obj, PackageBooking):
+                        confirm_package_sub_bookings(booking_obj)
                     send_booking_confirmation_email(booking_obj)
 
         return Response({"message": "Payment successful! Your booking is confirmed."})
@@ -651,6 +695,8 @@ class StripeWebhookView(APIView):
                             elif cp.purchase_type == 'session_pass':
                                 cp.remaining_sessions = max(0, cp.remaining_sessions - 1)
                             cp.save()
+                    elif isinstance(booking_obj, PackageBooking):
+                        confirm_package_sub_bookings(booking_obj)
 
                     send_booking_confirmation_email(booking_obj)
 

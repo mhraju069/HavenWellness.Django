@@ -406,7 +406,7 @@ class GetSlotView(APIView):
         # E. SALTROOM AVAILABILITY (Session-based, not slot-based)
         # -------------------------------------------------------------
         saltroom_data = None
-        if s_type == 'saltroom':
+        if s_type in ['saltroom', 'package', 'packages'] or sub_type == 'saltroom':
             saltroom_obj = Saltroom.objects.first()
             user = request.user if request.user and request.user.is_authenticated else None
             user_membership_data = {
@@ -687,11 +687,14 @@ class GetSlotView(APIView):
                 data["lunchroom"] = lunchroom_data
             elif sub_type in ['activity', 'activities']:
                 data["activities"] = activities_serializer.data
+            elif sub_type in ['saltroom']:
+                data["saltroom"] = saltroom_data
             else:
                 # Return combined package slots for all sub-services
                 data["sauna"] = sauna_dict
                 data["lunchroom"] = lunchroom_data
                 data["activities"] = activities_serializer.data
+                data["saltroom"] = saltroom_data
         elif s_type == 'saltroom':
             data = saltroom_data
         elif s_type in ['lunchroom']:

@@ -26,6 +26,7 @@ class SaunaBooking(models.Model):
     PAYMENT_STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('paid', 'Paid'),
+        ('paid_with_package', 'Paid with Package'),
     )
 
     booking_id = models.CharField(max_length=100, editable=False, db_index=True)
@@ -52,7 +53,7 @@ class SaunaBooking(models.Model):
     # Price & status
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    payment_status = models.CharField(max_length=30, choices=PAYMENT_STATUS_CHOICES, default='pending')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -113,6 +114,7 @@ class LunchroomBooking(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('confirmed', 'Confirmed'),
+        ('confirmed_with_package', 'Confirmed with Package'),
         ('cancelled', 'Cancelled'),
     )
     booking_id = models.CharField(max_length=100, editable=False, db_index=True)
@@ -134,7 +136,7 @@ class LunchroomBooking(models.Model):
     hobbies = models.CharField(max_length=100, null=True, blank=True)
     celebration_details = models.TextField(null=True, blank=True)
 
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='confirmed')
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='confirmed')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -163,6 +165,7 @@ class ActivityBooking(models.Model):
     PAYMENT_STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('paid', 'Paid'),
+        ('paid_with_package', 'Paid with Package'),
     )
 
     booking_id = models.CharField(max_length=100, editable=False, db_index=True)
@@ -176,7 +179,7 @@ class ActivityBooking(models.Model):
     special_request = models.TextField(null=True, blank=True)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='confirmed')
-    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    payment_status = models.CharField(max_length=30, choices=PAYMENT_STATUS_CHOICES, default='pending')
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -287,6 +290,7 @@ class SaltRoomBooking(models.Model):
     PAYMENT_STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('paid', 'Paid'),
+        ('paid_with_package', 'Paid with Package'),
     )
 
     booking_id = models.CharField(max_length=100, editable=False, db_index=True)
@@ -305,7 +309,7 @@ class SaltRoomBooking(models.Model):
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_paid = models.BooleanField(default=False)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    payment_status = models.CharField(max_length=30, choices=PAYMENT_STATUS_CHOICES, default='pending')
 
     used_pass = models.BooleanField(default=False)
     used_subscription = models.BooleanField(default=False)
@@ -318,7 +322,7 @@ class SaltRoomBooking(models.Model):
         return f"{self.booking_id} | {self.name or (self.user.email if self.user else 'Guest')} | {self.date} {self.start_time}"
 
     def save(self, *args, **kwargs):
-        if self.payment_status == 'paid':
+        if self.payment_status in ['paid', 'paid_with_package']:
             self.is_paid = True
         elif not self.is_paid:
             self.payment_status = self.payment_status or 'pending'

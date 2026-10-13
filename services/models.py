@@ -3,14 +3,6 @@ from django.utils import duration
 from django.core.files import images
 from django.db import models
 
-class ServiceSettings(models.Model):
-    open_time = models.TimeField()
-    close_time = models.TimeField()
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-
 # Create your models here.
 class Services(models.Model):
     SERVICE_TYPES = [
@@ -31,6 +23,25 @@ class Services(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class ServiceSettings(models.Model):
+    # WEEK_DAY_CHOICES = [
+    #     ('Monday', 'Monday'),
+    #     ('Tuesday', 'Tuesday'),
+    #     ('Wednesday', 'Wednesday'),
+    #     ('Thursday', 'Thursday'),
+    #     ('Friday', 'Friday'),
+    #     ('Saturday', 'Saturday'),
+    #     ('Sunday', 'Sunday'),
+    # ]
+    # service = models.ForeignKey(Services, on_delete=models.CASCADE, related_name='settings',blank=True, null=True)
+    # week_days = models.JSONField(choices=WEEK_DAY_CHOICES,default=list, blank=True, help_text="List of week days, e.g. ['Monday', 'Tuesday']")
+    open_time = models.TimeField()
+    close_time = models.TimeField()
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
 
 class PrivateSauna(models.Model):
