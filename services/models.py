@@ -26,22 +26,33 @@ class Services(models.Model):
 
 
 class ServiceSettings(models.Model):
-    # WEEK_DAY_CHOICES = [
-    #     ('Monday', 'Monday'),
-    #     ('Tuesday', 'Tuesday'),
-    #     ('Wednesday', 'Wednesday'),
-    #     ('Thursday', 'Thursday'),
-    #     ('Friday', 'Friday'),
-    #     ('Saturday', 'Saturday'),
-    #     ('Sunday', 'Sunday'),
-    # ]
-    # service = models.ForeignKey(Services, on_delete=models.CASCADE, related_name='settings',blank=True, null=True)
-    # week_days = models.JSONField(choices=WEEK_DAY_CHOICES,default=list, blank=True, help_text="List of week days, e.g. ['Monday', 'Tuesday']")
-    open_time = models.TimeField()
-    close_time = models.TimeField()
+    WEEK_DAY_CHOICES = [
+        ('Monday', 'Monday'),
+        ('Tuesday', 'Tuesday'),
+        ('Wednesday', 'Wednesday'),
+        ('Thursday', 'Thursday'),
+        ('Friday', 'Friday'),
+        ('Saturday', 'Saturday'),
+        ('Sunday', 'Sunday'),
+    ]
+    service = models.ForeignKey(Services, on_delete=models.CASCADE, related_name='settings', blank=True, null=True, help_text="Specific Service (leave blank for default opening hours across all services)")
+    week_days = models.JSONField(default=list, blank=True, help_text="List of week days, e.g. ['Monday', 'Tuesday'] or ['Saturday', 'Sunday']")
+    open_time = models.TimeField(default="09:00:00")
+    close_time = models.TimeField(default="21:00:00")
+    is_closed = models.BooleanField(default=False, help_text="Check if service is closed on these days")
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Service Setting / Operating Hours"
+        verbose_name_plural = "Service Settings / Operating Hours"
+
+    def __str__(self):
+        svc_name = self.service.title if self.service else "Global Default"
+        days = ", ".join(self.week_days) if self.week_days else "All days"
+        status_str = "Closed" if self.is_closed else f"{self.open_time} - {self.close_time}"
+        return f"{svc_name} | {days} | {status_str}"
 
 
 class PrivateSauna(models.Model):

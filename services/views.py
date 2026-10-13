@@ -218,6 +218,71 @@ class ServiceDetailView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
+def get_service_operating_hours(service_type_or_key, target_date):
+    """
+    Helper function to determine the operating hours for a specific service on a target date.
+    Returns: (open_time, close_time, is_closed)
+    Priority:
+    1. SpecialOpeningDate (applies facility-wide override)
+    2. ServiceSettings matching service.type and target weekday
+    3. ServiceSettings matching service.type and week_days=[] (all days)
+    4. ServiceSettings matching service=None (global) and target weekday
+    5. ServiceSettings matching service=None (global) and week_days=[]
+    6. Default fallback (09:00 - 21:00)
+    """
+    special_opening = SpecialOpeningDate.objects.filter(date=target_date).first()
+    if special_opening:
+        return special_opening.open_time, special_opening.close_time, False
+
+    weekday_name = target_date.strftime("%A").lower()
+
+    type_map = {
+        'sauna': 'sauna',
+        'private_sauna': 'sauna',
+        'shared_sauna': 'sauna',
+        'lunchroom': 'lunchroom',
+        'saltroom': 'saltroom',
+        'activity': 'activity',
+        'activities': 'activity',
+        'package': 'package',
+        'packages': 'package',
+        'event': 'event',
+    }
+    canonical_type = type_map.get(str(service_type_or_key).lower(), str(service_type_or_key).lower())
+
+    service_settings_qs = ServiceSettings.objects.filter(service__type=canonical_type)
+    matching_setting = None
+    fallback_service_setting = None
+
+    for setting in service_settings_qs:
+        days = [str(d).strip().lower() for d in (setting.week_days or [])]
+        if weekday_name in days:
+            matching_setting = setting
+            break
+        elif not days and fallback_service_setting is None:
+            fallback_service_setting = setting
+
+    chosen = matching_setting or fallback_service_setting
+
+    if not chosen:
+        global_settings_qs = ServiceSettings.objects.filter(service__isnull=True)
+        fallback_global = None
+        for setting in global_settings_qs:
+            days = [str(d).strip().lower() for d in (setting.week_days or [])]
+            if weekday_name in days:
+                chosen = setting
+                break
+            elif not days and fallback_global is None:
+                fallback_global = setting
+        if not chosen:
+            chosen = fallback_global
+
+    if chosen:
+        return chosen.open_time, chosen.close_time, chosen.is_closed
+
+    return time(9, 0), time(21, 0), False
+
+
 class GetSlotView(APIView):
     permission_classes = [AllowAny]
 
@@ -256,76 +321,75 @@ class GetSlotView(APIView):
                 "is_blocked": True,
                 "date": date_str,
                 "data": {},
-                "message": "No slots available. This date is blocked."
+                "message": "No slots available for this day. Please choose another date."
             }, status=status.HTTP_200_OK)
 
-        # 2. Determine opening and closing times
-        special_opening = SpecialOpeningDate.objects.filter(date=target_date).first()
-        if special_opening:
-            open_time = special_opening.open_time
-            close_time = special_opening.close_time
-        else:
-            settings_obj = ServiceSettings.objects.first()
-            if settings_obj:
-                open_time = settings_obj.open_time
-                close_time = settings_obj.close_time
-            else:
-                open_time = time(9, 0)
-                close_time = time(21, 0)
+        # 2. Determine Service-specific Operating Hours
+        sauna_open_t, sauna_close_t, sauna_is_closed = get_service_operating_hours('sauna', target_date)
+        lunch_open_t, lunch_close_t, lunch_is_closed = get_service_operating_hours('lunchroom', target_date)
+        salt_open_t, salt_close_t, salt_is_closed = get_service_operating_hours('saltroom', target_date)
+        act_open_t, act_close_t, act_is_closed = get_service_operating_hours('activity', target_date)
 
-        open_dt = datetime.combine(target_date, open_time)
-        close_dt = datetime.combine(target_date, close_time)
+        # Global/fallback operating hours for the top-level response
+        main_type_for_header = sub_type or s_type or 'sauna'
+        header_open_t, header_close_t, header_is_closed = get_service_operating_hours(main_type_for_header, target_date)
 
         # -------------------------------------------------------------
         # A. PRIVATE SAUNA SLOT CALCULATION (3h/4h sessions + 30m buffer)
         # -------------------------------------------------------------
-        private_bookings = SaunaBooking.objects.filter(
-            booking_date=target_date,
-            sauna_type='private'
-        ).exclude(status='cancelled')
+        private_3_hours = []
+        private_4_hours = []
+        private_open_dt = datetime.combine(target_date, sauna_open_t)
+        private_close_dt = datetime.combine(target_date, sauna_close_t)
 
-        private_booked_intervals = []
-        for pb in private_bookings:
-            pb_start = datetime.combine(target_date, pb.booking_time)
-            session_hours = 4 if pb.time_slot == '4_hours' else 3
-            pb_end = pb_start + timedelta(hours=session_hours + 0.5)
-            private_booked_intervals.append((pb_start, pb_end))
+        if not sauna_is_closed:
+            private_bookings = SaunaBooking.objects.filter(
+                booking_date=target_date,
+                sauna_type='private'
+            ).exclude(status='cancelled')
 
-        def generate_private_slots(duration_hours):
-            session_td = timedelta(hours=duration_hours)
-            step_td = timedelta(hours=duration_hours + 0.5)
-            slots = []
-            curr_dt = open_dt
+            private_booked_intervals = []
+            for pb in private_bookings:
+                pb_start = datetime.combine(target_date, pb.booking_time)
+                session_hours = 4 if pb.time_slot == '4_hours' else 3
+                pb_end = pb_start + timedelta(hours=session_hours + 0.5)
+                private_booked_intervals.append((pb_start, pb_end))
 
-            while curr_dt + session_td <= close_dt:
-                candidate_start = curr_dt
-                candidate_session_end = candidate_start + session_td
-                candidate_buffer_end = candidate_start + step_td
+            def generate_private_slots(duration_hours):
+                session_td = timedelta(hours=duration_hours)
+                step_td = timedelta(hours=duration_hours + 0.5)
+                slots = []
+                curr_dt = private_open_dt
 
-                overlap = False
-                max_overlap_end = None
+                while curr_dt + session_td <= private_close_dt:
+                    candidate_start = curr_dt
+                    candidate_session_end = candidate_start + session_td
+                    candidate_buffer_end = candidate_start + step_td
 
-                for b_start, b_end in private_booked_intervals:
-                    if max(candidate_start, b_start) < min(candidate_buffer_end, b_end):
-                        overlap = True
-                        if max_overlap_end is None or b_end > max_overlap_end:
-                            max_overlap_end = b_end
+                    overlap = False
+                    max_overlap_end = None
 
-                if overlap and max_overlap_end:
-                    curr_dt = max_overlap_end
-                else:
-                    slots.append({
-                        "start_time": candidate_start.strftime("%H:%M"),
-                        "end_time": candidate_session_end.strftime("%H:%M"),
-                        "buffer_end_time": candidate_buffer_end.strftime("%H:%M"),
-                        "time_slot": f"{duration_hours}_hours"
-                    })
-                    curr_dt = candidate_buffer_end
+                    for b_start, b_end in private_booked_intervals:
+                        if max(candidate_start, b_start) < min(candidate_buffer_end, b_end):
+                            overlap = True
+                            if max_overlap_end is None or b_end > max_overlap_end:
+                                max_overlap_end = b_end
 
-            return slots
+                    if overlap and max_overlap_end:
+                        curr_dt = max_overlap_end
+                    else:
+                        slots.append({
+                            "start_time": candidate_start.strftime("%H:%M"),
+                            "end_time": candidate_session_end.strftime("%H:%M"),
+                            "buffer_end_time": candidate_buffer_end.strftime("%H:%M"),
+                            "time_slot": f"{duration_hours}_hours"
+                        })
+                        curr_dt = candidate_buffer_end
 
-        private_3_hours = generate_private_slots(3)
-        private_4_hours = generate_private_slots(4)
+                return slots
+
+            private_3_hours = generate_private_slots(3)
+            private_4_hours = generate_private_slots(4)
 
         # -------------------------------------------------------------
         # B. SHARED SAUNA SLOT CALCULATION (90m session + 15m buffer)
@@ -338,45 +402,47 @@ class GetSlotView(APIView):
             sauna_type='shared'
         ).exclude(status='cancelled')
 
-        def generate_shared_slots():
-            session_td = timedelta(minutes=90)
-            step_td = timedelta(minutes=105)
-            slots = []
-            curr_dt = open_dt
+        shared_slots = []
+        if not sauna_is_closed:
+            def generate_shared_slots():
+                session_td = timedelta(minutes=90)
+                step_td = timedelta(minutes=105)
+                slots = []
+                curr_dt = private_open_dt
 
-            while curr_dt + session_td <= close_dt:
-                candidate_start = curr_dt
-                candidate_session_end = candidate_start + session_td
-                candidate_buffer_end = candidate_start + step_td
+                while curr_dt + session_td <= private_close_dt:
+                    candidate_start = curr_dt
+                    candidate_session_end = candidate_start + session_td
+                    candidate_buffer_end = candidate_start + step_td
 
-                booked_cap = 0
-                for sb in shared_bookings:
-                    sb_start = datetime.combine(target_date, sb.booking_time)
-                    sb_buffer_end = sb_start + timedelta(minutes=105)
-                    if max(candidate_start, sb_start) < min(candidate_buffer_end, sb_buffer_end):
-                        booked_cap += sb.capacity
+                    booked_cap = 0
+                    for sb in shared_bookings:
+                        sb_start = datetime.combine(target_date, sb.booking_time)
+                        sb_buffer_end = sb_start + timedelta(minutes=105)
+                        if max(candidate_start, sb_start) < min(candidate_buffer_end, sb_buffer_end):
+                            booked_cap += sb.capacity
 
-                remaining_cap = max(0, shared_max_capacity - booked_cap)
-                is_available = (remaining_cap > 0)
-                is_fully_booked = (booked_cap >= shared_max_capacity)
+                    remaining_cap = max(0, shared_max_capacity - booked_cap)
+                    is_available = (remaining_cap > 0)
+                    is_fully_booked = (booked_cap >= shared_max_capacity)
 
-                slots.append({
-                    "start_time": candidate_start.strftime("%H:%M"),
-                    "end_time": candidate_session_end.strftime("%H:%M"),
-                    "buffer_end_time": candidate_buffer_end.strftime("%H:%M"),
-                    "duration": "90_mins",
-                    "max_capacity": shared_max_capacity,
-                    "booked_capacity": booked_cap,
-                    "remaining_capacity": remaining_cap,
-                    "is_available": is_available,
-                    "is_fully_booked": is_fully_booked,
-                })
+                    slots.append({
+                        "start_time": candidate_start.strftime("%H:%M"),
+                        "end_time": candidate_session_end.strftime("%H:%M"),
+                        "buffer_end_time": candidate_buffer_end.strftime("%H:%M"),
+                        "duration": "90_mins",
+                        "max_capacity": shared_max_capacity,
+                        "booked_capacity": booked_cap,
+                        "remaining_capacity": remaining_cap,
+                        "is_available": is_available,
+                        "is_fully_booked": is_fully_booked,
+                    })
 
-                curr_dt = candidate_buffer_end
+                    curr_dt = candidate_buffer_end
 
-            return slots
+                return slots
 
-        shared_slots = generate_shared_slots()
+            shared_slots = generate_shared_slots()
 
         # -------------------------------------------------------------
         # C. LUNCHROOM AVAILABILITY INFO (Flexible time within open hours)
@@ -386,21 +452,34 @@ class GetSlotView(APIView):
         ).exclude(status='cancelled').count()
 
         lunchroom_data = {
-            "is_available": True,
-            "open_time": open_time.strftime("%H:%M"),
-            "close_time": close_time.strftime("%H:%M"),
+            "is_available": not lunch_is_closed,
+            "is_closed": lunch_is_closed,
+            "open_time": lunch_open_t.strftime("%H:%M"),
+            "close_time": lunch_close_t.strftime("%H:%M"),
             "existing_bookings_count": lunch_bookings_count,
-            "info": "Lunchroom accommodates flexible dining during opening hours. Choose any preferred arrival time."
+            "info": "Lunchroom is closed on this day." if lunch_is_closed else "Lunchroom accommodates flexible dining during opening hours. Choose any preferred arrival time."
         }
 
         # -------------------------------------------------------------
         # D. ACTIVITIES AVAILABILITY FOR THE DATE
         # -------------------------------------------------------------
-        activities_on_date = Activities.objects.prefetch_related('features').filter(
-            date=target_date,
-            is_available=True
-        ).order_by('open_time')
-        activities_serializer = ActivitiesSerializer(activities_on_date, many=True, context={'request': request})
+        if not act_is_closed:
+            activities_on_date = Activities.objects.prefetch_related('features').filter(
+                date=target_date,
+                is_available=True
+            ).order_by('open_time')
+            activities_serializer = ActivitiesSerializer(activities_on_date, many=True, context={'request': request})
+            activities_list = activities_serializer.data
+        else:
+            activities_list = []
+
+        activities_data = {
+            "is_available": not act_is_closed and len(activities_list) > 0,
+            "is_closed": act_is_closed,
+            "open_time": act_open_t.strftime("%H:%M"),
+            "close_time": act_close_t.strftime("%H:%M"),
+            "activities": activities_list,
+        }
 
         # -------------------------------------------------------------
         # E. SALTROOM AVAILABILITY (Session-based, not slot-based)
@@ -603,46 +682,49 @@ class GetSlotView(APIView):
             ).exclude(status='cancelled')
 
             saltroom_slots = []
-            curr_dt = open_dt
-            while curr_dt + duration_td <= close_dt:
-                slot_start = curr_dt
-                slot_end = slot_start + duration_td
-                slot_buffer_end = slot_start + step_td
+            if not salt_is_closed:
+                curr_dt = datetime.combine(target_date, salt_open_t)
+                salt_close_dt = datetime.combine(target_date, salt_close_t)
+                while curr_dt + duration_td <= salt_close_dt:
+                    slot_start = curr_dt
+                    slot_end = slot_start + duration_td
+                    slot_buffer_end = slot_start + step_td
 
-                # Count bookings overlapping this slot
-                booked_capacity = 0
-                for sb in saltroom_bookings:
-                    sb_start = datetime.combine(target_date, sb.start_time)
-                    sb_end = datetime.combine(target_date, sb.end_time)
-                    # Overlap if max(slot_start, sb_start) < min(slot_end, sb_end)
-                    if max(slot_start, sb_start) < min(slot_end, sb_end):
-                        booked_capacity += sb.capacity
+                    # Count bookings overlapping this slot
+                    booked_capacity = 0
+                    for sb in saltroom_bookings:
+                        sb_start = datetime.combine(target_date, sb.start_time)
+                        sb_end = datetime.combine(target_date, sb.end_time)
+                        # Overlap if max(slot_start, sb_start) < min(slot_end, sb_end)
+                        if max(slot_start, sb_start) < min(slot_end, sb_end):
+                            booked_capacity += sb.capacity
 
-                remaining_capacity = max(0, max_capacity - booked_capacity)
-                is_available = (remaining_capacity > 0)
-                is_fully_booked = (booked_capacity >= max_capacity)
+                    remaining_capacity = max(0, max_capacity - booked_capacity)
+                    is_available = (remaining_capacity > 0)
+                    is_fully_booked = (booked_capacity >= max_capacity)
 
-                saltroom_slots.append({
-                    "start_time": slot_start.strftime("%H:%M"),
-                    "end_time": slot_end.strftime("%H:%M"),
-                    "buffer_end_time": slot_buffer_end.strftime("%H:%M"),
-                    "duration_minutes": int(duration_td.total_seconds() // 60),
-                    "buffer_minutes": int(buffer_td.total_seconds() // 60),
-                    "max_capacity": max_capacity,
-                    "booked_capacity": booked_capacity,
-                    "remaining_capacity": remaining_capacity,
-                    "is_available": is_available,
-                    "is_fully_booked": is_fully_booked,
-                })
+                    saltroom_slots.append({
+                        "start_time": slot_start.strftime("%H:%M"),
+                        "end_time": slot_end.strftime("%H:%M"),
+                        "buffer_end_time": slot_buffer_end.strftime("%H:%M"),
+                        "duration_minutes": int(duration_td.total_seconds() // 60),
+                        "buffer_minutes": int(buffer_td.total_seconds() // 60),
+                        "max_capacity": max_capacity,
+                        "booked_capacity": booked_capacity,
+                        "remaining_capacity": remaining_capacity,
+                        "is_available": is_available,
+                        "is_fully_booked": is_fully_booked,
+                    })
 
-                curr_dt = slot_buffer_end
+                    curr_dt = slot_buffer_end
 
             available_slots_only = [s for s in saltroom_slots if s["is_available"]]
 
             saltroom_data = {
-                "is_available": len(available_slots_only) > 0,
-                "open_time": open_time.strftime("%H:%M"),
-                "close_time": close_time.strftime("%H:%M"),
+                "is_available": not salt_is_closed and len(available_slots_only) > 0,
+                "is_closed": salt_is_closed,
+                "open_time": salt_open_t.strftime("%H:%M"),
+                "close_time": salt_close_t.strftime("%H:%M"),
                 "duration_minutes": int(duration_td.total_seconds() // 60),
                 "buffer_minutes": int(buffer_td.total_seconds() // 60),
                 "max_capacity": max_capacity,
@@ -663,13 +745,23 @@ class GetSlotView(APIView):
 
         # Sauna data
         sauna_dict = {
+            "is_available": not sauna_is_closed and (len(private_3_hours) > 0 or len(private_4_hours) > 0 or len(shared_slots) > 0),
+            "is_closed": sauna_is_closed,
+            "open_time": sauna_open_t.strftime("%H:%M"),
+            "close_time": sauna_close_t.strftime("%H:%M"),
             "private_sauna": {
+                "open_time": sauna_open_t.strftime("%H:%M"),
+                "close_time": sauna_close_t.strftime("%H:%M"),
+                "is_closed": sauna_is_closed,
                 "slots": {
                     "3_hours": private_3_hours,
                     "4_hours": private_4_hours
                 }
             },
             "shared_sauna": {
+                "open_time": sauna_open_t.strftime("%H:%M"),
+                "close_time": sauna_close_t.strftime("%H:%M"),
+                "is_closed": sauna_is_closed,
                 "max_capacity_per_slot": shared_max_capacity,
                 "slots": shared_slots,
             }
@@ -686,23 +778,21 @@ class GetSlotView(APIView):
             elif sub_type in ['lunchroom']:
                 data["lunchroom"] = lunchroom_data
             elif sub_type in ['activity', 'activities']:
-                data["activities"] = activities_serializer.data
+                data["activities"] = activities_data
             elif sub_type in ['saltroom']:
                 data["saltroom"] = saltroom_data
             else:
                 # Return combined package slots for all sub-services
                 data["sauna"] = sauna_dict
                 data["lunchroom"] = lunchroom_data
-                data["activities"] = activities_serializer.data
+                data["activities"] = activities_data
                 data["saltroom"] = saltroom_data
         elif s_type == 'saltroom':
             data = saltroom_data
         elif s_type in ['lunchroom']:
             data = lunchroom_data
         elif s_type in ['activity', 'activities']:
-            data = {
-                "activities": activities_serializer.data
-            }
+            data = activities_data
         elif s_type in ['private_sauna']:
             data = {"private_sauna": sauna_dict["private_sauna"]}
         elif s_type in ['shared_sauna']:
@@ -716,8 +806,9 @@ class GetSlotView(APIView):
             "is_blocked": False,
             "date": date_str,
             "service_type": s_type or "sauna",
-            "open_time": open_time.strftime("%H:%M"),
-            "close_time": close_time.strftime("%H:%M"),
+            "open_time": header_open_t.strftime("%H:%M"),
+            "close_time": header_close_t.strftime("%H:%M"),
+            "is_closed": header_is_closed,
             "data": data,
             "message": "Available Slots",
         }, status=status.HTTP_200_OK)
