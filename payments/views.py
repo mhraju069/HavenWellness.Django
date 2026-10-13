@@ -25,11 +25,20 @@ from .serializers import (
 )
 
 
-def create_payment_intent_for_booking(booking, currency="eur"):
+def create_payment_intent_for_booking(booking, currency="eur", payment_method=None):
     price = float(booking.total_price)
     amount_cents = int(round(price * 100))
     if amount_cents <= 0:
         return None, None, None
+
+    # Resolve payment_method_types for Stripe
+    # Allow ["card", "ideal"] so frontend can confirm either card or iDEAL smoothly
+    if payment_method == "ideal":
+        pm_types = ["ideal", "card"]
+    elif payment_method in ("card", None, ""):
+        pm_types = ["card", "ideal"]
+    else:
+        pm_types = ["card", "ideal"]
 
     # Detect booking type
     if hasattr(booking, 'purchase_type'):
@@ -100,6 +109,7 @@ def create_payment_intent_for_booking(booking, currency="eur"):
     intent_kwargs = {
         "amount": amount_cents,
         "currency": currency.lower(),
+        "payment_method_types": pm_types,
         "metadata": metadata,
         "description": f"Payment for {booking_label} Booking {booking.booking_id}",
     }
@@ -159,6 +169,7 @@ class CreatePaymentIntentAPIView(APIView):
 
         booking_id_input = serializer.validated_data.get('booking_id')
         currency = serializer.validated_data.get('currency', 'eur')
+        payment_method = request.data.get('payment_method') or serializer.validated_data.get('payment_method')
 
         booking = (
             SaunaBooking.objects.filter(booking_id=booking_id_input).first()
@@ -179,7 +190,9 @@ class CreatePaymentIntentAPIView(APIView):
             return Response({"error": f"Booking or purchase with ID '{booking_id_input}' not found."}, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            payment, client_secret, intent_id = create_payment_intent_for_booking(booking, currency=currency)
+            payment, client_secret, intent_id = create_payment_intent_for_booking(
+                booking, currency=currency, payment_method=payment_method
+            )
             return Response({
                 "success": True,
                 "client_secret": client_secret,

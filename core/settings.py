@@ -14,6 +14,7 @@ except ImportError:
 
 DEBUG = True
 ALLOWED_HOSTS = ['*']
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https?://.*$",
@@ -22,6 +23,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "83n^4v$htzuagc^ece+qzqkb9+jwp0o%(flpbu)_)i
 BASE_DIR = Path(__file__).resolve().parent.parent
 CORS_ALLOW_HEADERS = list(default_headers) + [
     'ngrok-skip-browser-warning',
+    'bypass-tunnel-reminder',
     'lang',
     'accept-language',
     'authorization',

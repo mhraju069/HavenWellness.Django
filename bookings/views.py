@@ -699,3 +699,79 @@ class SaltRoomBookingAPIView(generics.ListCreateAPIView):
                 "data": SaltRoomBookingSerializer(booking).data,
                 "message": "Saltroom booking created successfully. Proceed with Stripe payment using client_secret.",
             }, status=status.HTTP_201_CREATED)
+
+
+class BookingDetailAPIView(APIView):
+    """
+    Lookup any booking details by booking_id (e.g. SR-8503, SB-0001, PKG-0001, etc.)
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, booking_id, *args, **kwargs):
+        prefix = booking_id.upper().split('-')[0] if '-' in booking_id else ''
+
+        booking = None
+        serializer = None
+
+        if prefix == 'SR' or booking_id.startswith('SR-'):
+            booking = SaltRoomBooking.objects.filter(booking_id__iexact=booking_id).first()
+            if booking:
+                serializer = SaltRoomBookingSerializer(booking)
+        elif prefix == 'SB' or booking_id.startswith('SB-'):
+            booking = SaunaBooking.objects.filter(booking_id__iexact=booking_id).first()
+            if booking:
+                serializer = SaunaBookingSerializer(booking)
+        elif prefix == 'PKG' or booking_id.startswith('PKG-'):
+            booking = PackageBooking.objects.filter(booking_id__iexact=booking_id).first()
+            if booking:
+                serializer = PackageBookingSerializer(booking)
+        elif prefix == 'LB' or booking_id.startswith('LB-'):
+            booking = LunchroomBooking.objects.filter(booking_id__iexact=booking_id).first()
+            if booking:
+                serializer = LunchroomBookingSerializer(booking)
+        elif prefix == 'ACT' or booking_id.startswith('ACT-'):
+            booking = ActivityBooking.objects.filter(booking_id__iexact=booking_id).first()
+            if booking:
+                serializer = ActivityBookingSerializer(booking)
+        elif prefix == 'EVT' or booking_id.startswith('EVT-'):
+            booking = EventBooking.objects.filter(booking_id__iexact=booking_id).first()
+            if booking:
+                serializer = EventBookingSerializer(booking)
+        else:
+            # Fallback search across all booking models
+            booking = (
+                SaltRoomBooking.objects.filter(booking_id__iexact=booking_id).first()
+                or SaunaBooking.objects.filter(booking_id__iexact=booking_id).first()
+                or PackageBooking.objects.filter(booking_id__iexact=booking_id).first()
+                or LunchroomBooking.objects.filter(booking_id__iexact=booking_id).first()
+                or ActivityBooking.objects.filter(booking_id__iexact=booking_id).first()
+                or EventBooking.objects.filter(booking_id__iexact=booking_id).first()
+            )
+            if booking:
+                if isinstance(booking, SaltRoomBooking):
+                    serializer = SaltRoomBookingSerializer(booking)
+                elif isinstance(booking, SaunaBooking):
+                    serializer = SaunaBookingSerializer(booking)
+                elif isinstance(booking, PackageBooking):
+                    serializer = PackageBookingSerializer(booking)
+                elif isinstance(booking, LunchroomBooking):
+                    serializer = LunchroomBookingSerializer(booking)
+                elif isinstance(booking, ActivityBooking):
+                    serializer = ActivityBookingSerializer(booking)
+                elif isinstance(booking, EventBooking):
+                    serializer = EventBookingSerializer(booking)
+
+        if not booking or not serializer:
+            return Response({
+                "success": False,
+                "error": f"Booking with ID '{booking_id}' not found."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({
+            "success": True,
+            "booking_id": booking.booking_id,
+            "status": getattr(booking, 'status', None),
+            "payment_status": getattr(booking, 'payment_status', None),
+            "is_paid": getattr(booking, 'is_paid', False),
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
