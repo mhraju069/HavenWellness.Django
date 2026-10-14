@@ -6,6 +6,7 @@ from .views import (
     ServiceOpeningHoursView,
     ServiceFeatureManageView,
     AdminBookingsView,
+    AdminPaymentsView,
 )
 from services.views import AllServicesView
 
@@ -14,6 +15,7 @@ urlpatterns = [
     path('user/', UserDashboardView.as_view(), name='user-dashboard'),
     path('admin/bookings/', AdminBookingsView.as_view(), name='admin-bookings-list'),
     path('admin/bookings/<str:booking_id>/', AdminBookingsView.as_view(), name='admin-booking-detail'),
+    path('admin/payments/', AdminPaymentsView.as_view(), name='admin-payments'),
     path('admin/services/', AllServicesView.as_view(), name='service-list'),
     path('admin/services/manage/', ServiceCRUDView.as_view(), name='admin-service-crud'),
     path('admin/services/manage/<int:pk>/', ServiceCRUDView.as_view(), name='admin-service-crud-detail'),

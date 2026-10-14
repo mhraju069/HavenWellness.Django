@@ -18,13 +18,17 @@ from bookings.models import (
     PackageBooking,
     SaltRoomBooking
 )
-from payments.models import ClientPurchase
+from payments.models import ClientPurchase, Payments
 from .serializers import (
     UserDashboardResponseSerializer,
     AdminBookingItemSerializer,
     AdminBookingsPaginationResponseSerializer,
     AdminBookingDetailResponseSerializer,
-    AdminBookingStatusUpdateSerializer
+    AdminBookingStatusUpdateSerializer,
+    AdminPaymentsResponseSerializer,
+    MonthlyPaymentsSummarySerializer,
+    ServicePaymentBreakdownItemSerializer,
+    AdminPaymentListItemSerializer
 )
 
 
@@ -2664,3 +2668,493 @@ class AdminBookingsView(APIView):
 
     def put(self, request, booking_id=None):
         return self.patch(request, booking_id)
+
+
+class AdminPaymentsView(APIView):
+    """
+    Admin Payments API providing:
+    1. Monthly Summary & Metrics:
+       - Total payments collected this month across all paid services.
+       - Service-wise breakdown this month for Private Sauna, Shared Sauna, Sauna Total,
+         Salt Room, Activity, and Package (excluding free services Lunchroom & Event).
+    2. Bookings Payment Records List:
+       - Comprehensive list of bookings from payment-generating services with amount,
+         currency, payment status, transaction details, client info, and booking details.
+    3. Search & Filter:
+       - Search by Booking ID, Date, Client Email, or Client Name.
+       - Filter by service_type, date range, payment_status, booking_status.
+    4. Pagination:
+       - Standard page & page_size pagination.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Admin Payments"],
+        summary="Admin Payments overview, monthly breakdown, and booking payments list",
+        description="Returns this month's total revenue, service-wise breakdown (Sauna, Saltroom, Activity, Package), and searchable/filterable list of booking payments.",
+        parameters=[
+            OpenApiParameter(name="month", description="Target month for metrics (1-12, default: current month)", required=False, type=int),
+            OpenApiParameter(name="year", description="Target year for metrics (default: current year)", required=False, type=int),
+            OpenApiParameter(name="search", description="Search keyword across Booking ID, Client Name, Email, and Phone", required=False, type=str),
+            OpenApiParameter(name="service_type", description="Filter payments by service: sauna, private_sauna, shared_sauna, saltroom, activity, package, all", required=False, type=str),
+            OpenApiParameter(name="payment_status", description="Filter by payment status: paid, paid_with_package, pending, all", required=False, type=str),
+            OpenApiParameter(name="date", description="Exact booking or payment date (YYYY-MM-DD or 'today')", required=False, type=str),
+            OpenApiParameter(name="start_date", description="Filter booking/payment dates starting from this date (YYYY-MM-DD)", required=False, type=str),
+            OpenApiParameter(name="end_date", description="Filter booking/payment dates up to this date (YYYY-MM-DD)", required=False, type=str),
+            OpenApiParameter(name="booking_id", description="Direct filter by booking ID", required=False, type=str),
+            OpenApiParameter(name="client_name", description="Direct filter by client name", required=False, type=str),
+            OpenApiParameter(name="email", description="Direct filter by client email", required=False, type=str),
+            OpenApiParameter(name="ordering", description="Sorting: -created_at (default), created_at, -amount, amount, -date, date", required=False, type=str),
+            OpenApiParameter(name="page", description="Page number (default: 1)", required=False, type=int),
+            OpenApiParameter(name="page_size", description="Number of results per page (default: 10, max: 100)", required=False, type=int),
+        ],
+        responses={200: AdminPaymentsResponseSerializer},
+    )
+    def get(self, request):
+        now = timezone.now()
+
+        # 1. Parse target month and year for monthly summary metrics
+        try:
+            target_year = int(request.query_params.get('year', now.year))
+        except (ValueError, TypeError):
+            target_year = now.year
+
+        try:
+            target_month = int(request.query_params.get('month', now.month))
+            if target_month < 1 or target_month > 12:
+                target_month = now.month
+        except (ValueError, TypeError):
+            target_month = now.month
+
+        try:
+            month_date = date(target_year, target_month, 1)
+            month_name = month_date.strftime("%B %Y")
+        except ValueError:
+            month_date = date(now.year, now.month, 1)
+            month_name = month_date.strftime("%B %Y")
+            target_year = now.year
+            target_month = now.month
+
+        # 2. Compute Monthly Breakdown across Paid Services (Sauna, Saltroom, Activity, Package)
+        # We count bookings with payment_status in ['paid', 'paid_with_package'] for the target month
+        valid_paid_statuses = ['paid', 'paid_with_package']
+
+        month_filter = Q(created_at__year=target_year, created_at__month=target_month, payment_status__in=valid_paid_statuses)
+
+        # Private Sauna
+        priv_sauna_qs = SaunaBooking.objects.filter(month_filter, sauna_type='private')
+        priv_sauna_rev = sum((b.total_price for b in priv_sauna_qs), 0)
+        priv_sauna_count = priv_sauna_qs.count()
+
+        # Shared Sauna
+        shared_sauna_qs = SaunaBooking.objects.filter(month_filter, sauna_type='shared')
+        shared_sauna_rev = sum((b.total_price for b in shared_sauna_qs), 0)
+        shared_sauna_count = shared_sauna_qs.count()
+
+        # Sauna Combined Total
+        sauna_total_rev = priv_sauna_rev + shared_sauna_rev
+        sauna_total_count = priv_sauna_count + shared_sauna_count
+
+        # Salt Room
+        salt_qs = SaltRoomBooking.objects.filter(month_filter)
+        salt_rev = sum((b.total_price for b in salt_qs), 0)
+        salt_count = salt_qs.count()
+
+        # Activity
+        act_qs = ActivityBooking.objects.filter(month_filter)
+        act_rev = sum((b.total_price for b in act_qs), 0)
+        act_count = act_qs.count()
+
+        # Package
+        pkg_qs = PackageBooking.objects.filter(month_filter)
+        pkg_rev = sum((b.total_price for b in pkg_qs), 0)
+        pkg_count = pkg_qs.count()
+
+        total_month_rev = sauna_total_rev + salt_rev + act_rev + pkg_rev
+        total_month_transactions = sauna_total_count + salt_count + act_count + pkg_count
+
+        services_breakdown_list = [
+            {
+                "service_type": "private_sauna",
+                "service_name": "Private Sauna",
+                "revenue": str(priv_sauna_rev),
+                "transactions_count": priv_sauna_count
+            },
+            {
+                "service_type": "shared_sauna",
+                "service_name": "Shared Sauna",
+                "revenue": str(shared_sauna_rev),
+                "transactions_count": shared_sauna_count
+            },
+            {
+                "service_type": "sauna",
+                "service_name": "Sauna Total",
+                "revenue": str(sauna_total_rev),
+                "transactions_count": sauna_total_count
+            },
+            {
+                "service_type": "saltroom",
+                "service_name": "Salt Room",
+                "revenue": str(salt_rev),
+                "transactions_count": salt_count
+            },
+            {
+                "service_type": "activity",
+                "service_name": "Activity",
+                "revenue": str(act_rev),
+                "transactions_count": act_count
+            },
+            {
+                "service_type": "package",
+                "service_name": "Package Experience",
+                "revenue": str(pkg_rev),
+                "transactions_count": pkg_count
+            }
+        ]
+
+        monthly_summary = {
+            "month_name": month_name,
+            "year": target_year,
+            "month": target_month,
+            "total_revenue": str(total_month_rev),
+            "total_transactions": total_month_transactions,
+            "currency": "EUR",
+            "services": services_breakdown_list,
+        }
+
+        # 3. Query Payments / Bookings List
+        search = (request.query_params.get('search') or request.query_params.get('q') or '').strip()
+        search_lower = search.lower()
+
+        raw_service_type = (request.query_params.get('service_type') or request.query_params.get('service') or '').strip().lower()
+        payment_filter = (request.query_params.get('payment_status') or '').strip().lower()
+        booking_id_filter = (request.query_params.get('booking_id') or '').strip()
+        name_filter = (request.query_params.get('client_name') or request.query_params.get('name') or '').strip()
+        email_filter = (request.query_params.get('email') or '').strip()
+
+        exact_date = parse_date_safe(request.query_params.get('date'))
+        start_date = parse_date_safe(request.query_params.get('start_date') or request.query_params.get('date_from'))
+        end_date = parse_date_safe(request.query_params.get('end_date') or request.query_params.get('date_to'))
+
+        # Build in-memory map of Payments table records for linking transactions
+        payments_map = {}
+        for p in Payments.objects.all():
+            if p.booking_id:
+                payments_map[p.booking_id.upper().strip()] = p
+
+        query_all = raw_service_type in ['', 'all']
+        include_sauna = query_all or raw_service_type in ['sauna', 'saunas', 'private_sauna', 'shared_sauna', 'private-sauna', 'shared-sauna']
+        include_saltroom = query_all or raw_service_type in ['saltroom', 'saltrooms', 'salt-room', 'salt_room']
+        include_activity = query_all or raw_service_type in ['activity', 'activities']
+        include_package = query_all or raw_service_type in ['package', 'packages']
+
+        payment_records = []
+
+        # Helper to format payment item
+        def build_payment_item(b, s_type, s_name, b_date_str, b_time_str, guests_count, details_dict, dt):
+            bid = b.booking_id
+            p_obj = payments_map.get(bid.upper().strip()) if bid else None
+
+            trans_id = p_obj.transaction_id or p_obj.stripe_payment_intent_id if p_obj else None
+            currency_code = p_obj.currency.upper() if (p_obj and p_obj.currency) else "EUR"
+            p_date_iso = (p_obj.created_at if p_obj else b.created_at).isoformat() if (p_obj and p_obj.created_at or b.created_at) else None
+
+            c_name = b.name if (hasattr(b, 'name') and b.name) else (
+                getattr(b.user, 'name', None) or getattr(b.user, 'username', '') if getattr(b, 'user', None) else ''
+            )
+            c_email = b.email if (hasattr(b, 'email') and b.email) else (
+                getattr(b.user, 'email', '') if getattr(b, 'user', None) else ''
+            )
+            c_phone = b.phone if (hasattr(b, 'phone') and b.phone) else (
+                getattr(b.user, 'phone', '') if getattr(b, 'user', None) else ''
+            )
+
+            return {
+                "id": b.id,
+                "booking_id": bid,
+                "service_type": s_type,
+                "service_name": s_name,
+                "client_name": c_name or "Guest",
+                "client_email": c_email,
+                "client_phone": c_phone,
+                "user_id": b.user_id if getattr(b, 'user_id', None) else (b.user.id if getattr(b, 'user', None) else None),
+                "amount": str(b.total_price),
+                "currency": currency_code,
+                "payment_status": b.payment_status,
+                "booking_status": b.status,
+                "date": b_date_str,
+                "time": b_time_str,
+                "guests": guests_count,
+                "transaction_id": trans_id,
+                "payment_date": p_date_iso,
+                "created_at": b.created_at.isoformat() if b.created_at else None,
+                "details": details_dict,
+                "_sort_created_at": b.created_at if b.created_at else dt,
+                "_sort_amount": float(b.total_price or 0),
+            }
+
+        # Query Sauna Bookings
+        if include_sauna:
+            qs = SaunaBooking.objects.select_related('user').all()
+            if raw_service_type in ['private_sauna', 'private-sauna']:
+                qs = qs.filter(sauna_type='private')
+            elif raw_service_type in ['shared_sauna', 'shared-sauna']:
+                qs = qs.filter(sauna_type='shared')
+
+            if payment_filter and payment_filter != 'all':
+                qs = qs.filter(payment_status__iexact=payment_filter)
+            if booking_id_filter:
+                qs = qs.filter(booking_id__icontains=booking_id_filter)
+            if name_filter:
+                qs = qs.filter(Q(name__icontains=name_filter) | Q(user__name__icontains=name_filter))
+            if email_filter:
+                qs = qs.filter(Q(email__icontains=email_filter) | Q(user__email__icontains=email_filter))
+
+            if exact_date:
+                qs = qs.filter(Q(booking_date=exact_date) | Q(created_at__date=exact_date))
+            if start_date:
+                qs = qs.filter(Q(booking_date__gte=start_date) | Q(created_at__date__gte=start_date))
+            if end_date:
+                qs = qs.filter(Q(booking_date__lte=end_date) | Q(created_at__date__lte=end_date))
+
+            if search:
+                if search_lower in ['sauna', 'saunas', 'private sauna', 'shared sauna']:
+                    pass
+                else:
+                    qs = qs.filter(
+                        Q(booking_id__icontains=search) |
+                        Q(name__icontains=search) |
+                        Q(email__icontains=search) |
+                        Q(phone__icontains=search) |
+                        Q(sauna_type__icontains=search) |
+                        Q(user__name__icontains=search) |
+                        Q(user__email__icontains=search)
+                    )
+
+            for b in qs:
+                svc_title = f"{b.get_sauna_type_display() if hasattr(b, 'get_sauna_type_display') else b.sauna_type.title()} Sauna"
+                dt = parse_booking_datetime(b.booking_date, b.booking_time)
+                payment_records.append(build_payment_item(
+                    b=b,
+                    s_type=b.sauna_type + "_sauna",
+                    s_name=svc_title,
+                    b_date_str=b.booking_date.strftime("%Y-%m-%d") if b.booking_date else "",
+                    b_time_str=b.booking_time.strftime("%H:%M") if b.booking_time else "",
+                    guests_count=b.capacity,
+                    details_dict={
+                        "sauna_type": b.sauna_type,
+                        "time_slot": b.time_slot,
+                        "selected_features": b.selected_features or [],
+                        "special_request": b.special_request or "",
+                    },
+                    dt=dt
+                ))
+
+        # Query Salt Room Bookings
+        if include_saltroom:
+            qs = SaltRoomBooking.objects.select_related('user').all()
+            if payment_filter and payment_filter != 'all':
+                qs = qs.filter(payment_status__iexact=payment_filter)
+            if booking_id_filter:
+                qs = qs.filter(booking_id__icontains=booking_id_filter)
+            if name_filter:
+                qs = qs.filter(Q(name__icontains=name_filter) | Q(user__name__icontains=name_filter))
+            if email_filter:
+                qs = qs.filter(Q(email__icontains=email_filter) | Q(user__email__icontains=email_filter))
+
+            if exact_date:
+                qs = qs.filter(Q(date=exact_date) | Q(created_at__date=exact_date))
+            if start_date:
+                qs = qs.filter(Q(date__gte=start_date) | Q(created_at__date__gte=start_date))
+            if end_date:
+                qs = qs.filter(Q(date__lte=end_date) | Q(created_at__date__lte=end_date))
+
+            if search:
+                if search_lower in ['salt', 'saltroom', 'salt room']:
+                    pass
+                else:
+                    qs = qs.filter(
+                        Q(booking_id__icontains=search) |
+                        Q(name__icontains=search) |
+                        Q(email__icontains=search) |
+                        Q(phone__icontains=search) |
+                        Q(user__name__icontains=search) |
+                        Q(user__email__icontains=search)
+                    )
+
+            for b in qs:
+                dt = parse_booking_datetime(b.date, b.start_time)
+                payment_records.append(build_payment_item(
+                    b=b,
+                    s_type="saltroom",
+                    s_name="Salt Room",
+                    b_date_str=b.date.strftime("%Y-%m-%d") if b.date else "",
+                    b_time_str=b.start_time.strftime("%H:%M") if b.start_time else "",
+                    guests_count=b.capacity,
+                    details_dict={
+                        "used_pass": b.used_pass,
+                        "used_subscription": b.used_subscription,
+                        "is_paid": b.is_paid,
+                        "special_request": b.special_request or "",
+                    },
+                    dt=dt
+                ))
+
+        # Query Activity Bookings
+        if include_activity:
+            qs = ActivityBooking.objects.select_related('user', 'activity').all()
+            if payment_filter and payment_filter != 'all':
+                qs = qs.filter(payment_status__iexact=payment_filter)
+            if booking_id_filter:
+                qs = qs.filter(booking_id__icontains=booking_id_filter)
+            if name_filter:
+                qs = qs.filter(Q(name__icontains=name_filter) | Q(user__name__icontains=name_filter))
+            if email_filter:
+                qs = qs.filter(Q(email__icontains=email_filter) | Q(user__email__icontains=email_filter))
+
+            if exact_date:
+                qs = qs.filter(Q(activity__date=exact_date) | Q(created_at__date=exact_date))
+            if start_date:
+                qs = qs.filter(Q(activity__date__gte=start_date) | Q(created_at__date__gte=start_date))
+            if end_date:
+                qs = qs.filter(Q(activity__date__lte=end_date) | Q(created_at__date__lte=end_date))
+
+            if search:
+                if search_lower in ['activity', 'activities']:
+                    pass
+                else:
+                    qs = qs.filter(
+                        Q(booking_id__icontains=search) |
+                        Q(name__icontains=search) |
+                        Q(email__icontains=search) |
+                        Q(phone__icontains=search) |
+                        Q(activity__title__icontains=search) |
+                        Q(user__name__icontains=search) |
+                        Q(user__email__icontains=search)
+                    )
+
+            for b in qs:
+                act_time = getattr(b.activity, 'open_time', None) if b.activity else None
+                act_date = getattr(b.activity, 'date', None) if b.activity else None
+                target_d = act_date or (b.created_at.date() if b.created_at else timezone.now().date())
+                dt = parse_booking_datetime(target_d, act_time)
+                payment_records.append(build_payment_item(
+                    b=b,
+                    s_type="activity",
+                    s_name=b.activity.title if (b.activity and b.activity.title) else "Activity",
+                    b_date_str=target_d.strftime("%Y-%m-%d") if target_d else "",
+                    b_time_str=act_time.strftime("%H:%M") if act_time else "",
+                    guests_count=b.capacity,
+                    details_dict={
+                        "activity_id": b.activity.id if b.activity else None,
+                        "activity_title": b.activity.title if b.activity else None,
+                        "special_request": b.special_request or "",
+                    },
+                    dt=dt
+                ))
+
+        # Query Package Bookings
+        if include_package:
+            qs = PackageBooking.objects.select_related('user').all()
+            if payment_filter and payment_filter != 'all':
+                qs = qs.filter(payment_status__iexact=payment_filter)
+            if booking_id_filter:
+                qs = qs.filter(booking_id__icontains=booking_id_filter)
+            if name_filter:
+                qs = qs.filter(Q(name__icontains=name_filter) | Q(user__name__icontains=name_filter))
+            if email_filter:
+                qs = qs.filter(Q(email__icontains=email_filter) | Q(user__email__icontains=email_filter))
+
+            if exact_date:
+                qs = qs.filter(Q(date=exact_date) | Q(created_at__date=exact_date))
+            if start_date:
+                qs = qs.filter(Q(date__gte=start_date) | Q(created_at__date__gte=start_date))
+            if end_date:
+                qs = qs.filter(Q(date__lte=end_date) | Q(created_at__date__lte=end_date))
+
+            if search:
+                if search_lower in ['package', 'packages', 'pkg']:
+                    pass
+                else:
+                    qs = qs.filter(
+                        Q(booking_id__icontains=search) |
+                        Q(name__icontains=search) |
+                        Q(email__icontains=search) |
+                        Q(phone__icontains=search) |
+                        Q(user__name__icontains=search) |
+                        Q(user__email__icontains=search)
+                    )
+
+            for b in qs:
+                dt = parse_booking_datetime(b.date, None)
+                payment_records.append(build_payment_item(
+                    b=b,
+                    s_type="package",
+                    s_name="Package Experience",
+                    b_date_str=b.date.strftime("%Y-%m-%d") if b.date else "",
+                    b_time_str="",
+                    guests_count=b.guests,
+                    details_dict={
+                        "is_custom": b.is_custom,
+                        "service_names": b.service_names or [],
+                        "booked_services_ids": b.booked_services_ids or [],
+                        "notes": b.notes or "",
+                    },
+                    dt=dt
+                ))
+
+        # 4. Sorting
+        ordering = (request.query_params.get('ordering') or request.query_params.get('sort_by') or '-created_at').strip()
+
+        if ordering in ['created_at', '+created_at', 'oldest']:
+            payment_records.sort(key=lambda x: str(x.get('_sort_created_at') or ''))
+        elif ordering in ['amount', '+amount', 'amount_asc']:
+            payment_records.sort(key=lambda x: x.get('_sort_amount', 0))
+        elif ordering in ['-amount', 'amount_desc']:
+            payment_records.sort(key=lambda x: x.get('_sort_amount', 0), reverse=True)
+        elif ordering in ['date', '+date', 'date_asc']:
+            payment_records.sort(key=lambda x: (str(x.get('date') or ''), str(x.get('time') or '')))
+        elif ordering in ['-date', 'date_desc']:
+            payment_records.sort(key=lambda x: (str(x.get('date') or ''), str(x.get('time') or '')), reverse=True)
+        else:
+            payment_records.sort(key=lambda x: str(x.get('_sort_created_at') or ''), reverse=True)
+
+        # 5. Pagination
+        try:
+            page = max(1, int(request.query_params.get('page', 1)))
+        except (ValueError, TypeError):
+            page = 1
+
+        try:
+            page_size = max(1, min(100, int(request.query_params.get('page_size', request.query_params.get('limit', 10)))))
+        except (ValueError, TypeError):
+            page_size = 10
+
+        total_count = len(payment_records)
+        total_pages = max(1, math.ceil(total_count / page_size)) if total_count > 0 else 1
+
+        if page > total_pages and total_count > 0:
+            page = total_pages
+
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated_items = payment_records[start_idx:end_idx]
+
+        for item in paginated_items:
+            item.pop('_sort_created_at', None)
+            item.pop('_sort_amount', None)
+
+        return Response({
+            "success": True,
+            "monthly_summary": monthly_summary,
+            "count": total_count,
+            "total_pages": total_pages,
+            "current_page": page,
+            "page_size": page_size,
+            "has_next": page < total_pages,
+            "has_previous": page > 1,
+            "next_page": page + 1 if page < total_pages else None,
+            "previous_page": page - 1 if page > 1 else None,
+            "results": paginated_items,
+            "data": paginated_items,
+        }, status=status.HTTP_200_OK)
