@@ -11,7 +11,12 @@ from payments.serializers import (
 class ServicesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Services
-        fields = ['id','title','subtitle' , 'description','image' ,'type']
+        fields = [
+            'id', 'title', 'subtitle', 'description', 'image', 'type',
+            'title_en', 'title_nl', 'title_de',
+            'subtitle_en', 'subtitle_nl', 'subtitle_de',
+            'description_en', 'description_nl', 'description_de',
+        ]
 
 
 #Activity services

@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/services/', include('services.urls')),
     path('api/bookings/', include('bookings.urls')),
     path('api/dashboard/', include('dashboards.urls')),
+    path('api/dashboards/', include('dashboards.urls')),
     path('api/payments/', include('payments.urls')),
     path('stripe/', include('djstripe.urls', namespace='djstripe')),
     path('api/notify/', include('notifications.urls')),

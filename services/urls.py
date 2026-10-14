@@ -3,6 +3,7 @@ from .views import *
 
 urlpatterns = [
     path('', AllServicesView.as_view()),
+    path('<int:pk>/', AllServicesView.as_view()),
     path('details/', ServiceDetailView.as_view()),
     path('details/<str:service_type>/', ServiceDetailView.as_view()),
     path('slots/', GetSlotView.as_view()),
