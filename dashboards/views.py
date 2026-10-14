@@ -1,3 +1,4 @@
+import math
 from datetime import datetime, date, time, timedelta
 from django.utils import timezone
 from django.db.models import Q
@@ -18,7 +19,13 @@ from bookings.models import (
     SaltRoomBooking
 )
 from payments.models import ClientPurchase
-from .serializers import UserDashboardResponseSerializer
+from .serializers import (
+    UserDashboardResponseSerializer,
+    AdminBookingItemSerializer,
+    AdminBookingsPaginationResponseSerializer,
+    AdminBookingDetailResponseSerializer,
+    AdminBookingStatusUpdateSerializer
+)
 
 
 def parse_booking_datetime(b_date, b_time=None):
@@ -1983,5 +1990,677 @@ class ServiceFeatureManageView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-    
-    
+def parse_date_safe(date_str):
+    """
+    Safely parses a date string in YYYY-MM-DD format or 'today' into a datetime.date object.
+    """
+    if not date_str:
+        return None
+    s = str(date_str).strip()
+    if s.lower() == 'today':
+        return timezone.now().date()
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+
+
+def serialize_admin_booking_item(b, service_type=None):
+    """
+    Standardized serializer for admin booking list & detail view across all 6 booking models.
+    """
+    if isinstance(b, SaunaBooking) or service_type == 'sauna':
+        svc_type = 'sauna'
+        svc_name = f"{b.get_sauna_type_display() if hasattr(b, 'get_sauna_type_display') else b.sauna_type.title()} Sauna"
+        b_date = b.booking_date.strftime("%Y-%m-%d") if b.booking_date else ""
+        b_time = b.booking_time.strftime("%H:%M") if b.booking_time else ""
+        end_time = None
+        guests = b.capacity
+        price = str(b.total_price)
+        status_val = b.status
+        payment_val = b.payment_status
+        req = b.special_request or ""
+        dt = parse_booking_datetime(b.booking_date, b.booking_time)
+        details = {
+            "sauna_type": b.sauna_type,
+            "time_slot": b.time_slot,
+            "selected_features": b.selected_features or [],
+            "special_request": req,
+        }
+
+    elif isinstance(b, LunchroomBooking) or service_type == 'lunchroom':
+        svc_type = 'lunchroom'
+        svc_name = "Lunchroom"
+        b_date = b.booking_date.strftime("%Y-%m-%d") if b.booking_date else ""
+        b_time = b.booking_time.strftime("%H:%M") if b.booking_time else ""
+        end_time = None
+        guests = b.capacity
+        price = "0.00"
+        status_val = b.status
+        payment_val = getattr(b, 'payment_status', 'confirmed')
+        req = b.special_request or ""
+        dt = parse_booking_datetime(b.booking_date, b.booking_time)
+        details = {
+            "celebration_type": b.celebration_type or "",
+            "celebration_date": b.celebration_date.strftime("%Y-%m-%d") if b.celebration_date else None,
+            "name_of_celebrant": b.name_of_celebrant or "",
+            "age_of_celebrant": b.age_of_celebrant,
+            "hobbies": b.hobbies or "",
+            "celebration_details": b.celebration_details or "",
+            "special_request": req,
+        }
+
+    elif isinstance(b, ActivityBooking) or service_type == 'activity':
+        svc_type = 'activity'
+        act_title = b.activity.title if (b.activity and b.activity.title) else "Activity"
+        svc_name = act_title
+        act_time = getattr(b.activity, 'open_time', None) if b.activity else None
+        act_date = getattr(b.activity, 'date', None) if b.activity else None
+        target_date = act_date or (b.created_at.date() if b.created_at else timezone.now().date())
+        b_date = target_date.strftime("%Y-%m-%d") if target_date else ""
+        b_time = act_time.strftime("%H:%M") if act_time else ""
+        end_time = b.activity.close_time.strftime("%H:%M") if (b.activity and b.activity.close_time) else None
+        guests = b.capacity
+        price = str(b.total_price)
+        status_val = b.status
+        payment_val = b.payment_status
+        req = b.special_request or ""
+        dt = parse_booking_datetime(target_date, act_time)
+        details = {
+            "activity_id": b.activity.id if b.activity else None,
+            "activity_title": act_title,
+            "special_request": req,
+        }
+
+    elif isinstance(b, SaltRoomBooking) or service_type == 'saltroom':
+        svc_type = 'saltroom'
+        svc_name = "Salt Room"
+        b_date = b.date.strftime("%Y-%m-%d") if b.date else ""
+        b_time = b.start_time.strftime("%H:%M") if b.start_time else ""
+        end_time = b.end_time.strftime("%H:%M") if b.end_time else None
+        guests = b.capacity
+        price = str(b.total_price)
+        status_val = b.status
+        payment_val = b.payment_status
+        req = b.special_request or ""
+        dt = parse_booking_datetime(b.date, b.start_time)
+        details = {
+            "used_pass": b.used_pass,
+            "used_subscription": b.used_subscription,
+            "is_paid": b.is_paid,
+            "special_request": req,
+        }
+
+    elif isinstance(b, PackageBooking) or service_type == 'package':
+        svc_type = 'package'
+        svc_name = "Package Experience"
+        b_date = b.date.strftime("%Y-%m-%d") if b.date else ""
+        b_time = ""
+        end_time = None
+        guests = b.guests
+        price = str(b.total_price)
+        status_val = b.status
+        payment_val = b.payment_status
+        req = b.notes or ""
+        dt = parse_booking_datetime(b.date, None)
+        details = {
+            "is_custom": b.is_custom,
+            "service_names": b.service_names or [],
+            "booked_services_ids": b.booked_services_ids or [],
+            "notes": b.notes or "",
+        }
+
+    elif isinstance(b, EventBooking) or service_type == 'event':
+        svc_type = 'event'
+        svc_name = "Special Event"
+        b_date = b.date.strftime("%Y-%m-%d") if b.date else ""
+        b_time = b.start_time.strftime("%H:%M") if b.start_time else ""
+        end_time = b.end_time.strftime("%H:%M") if b.end_time else None
+        guests = b.guests
+        price = "0.00"
+        status_val = getattr(b, 'status', 'confirmed')
+        payment_val = getattr(b, 'payment_status', 'pending')
+        req = b.notes or ""
+        dt = parse_booking_datetime(b.date, b.start_time)
+        details = {
+            "food_preference": b.food_preference or "",
+            "drink_preference": b.drink_preference or "",
+            "music_preference": b.music_preference or "",
+            "notes": b.notes or "",
+        }
+
+    else:
+        svc_type = getattr(b, 'service_type', 'booking')
+        svc_name = getattr(b, 'service_name', 'Booking')
+        b_date = ""
+        b_time = ""
+        end_time = None
+        guests = getattr(b, 'capacity', getattr(b, 'guests', 1))
+        price = str(getattr(b, 'total_price', '0.00'))
+        status_val = getattr(b, 'status', 'confirmed')
+        payment_val = getattr(b, 'payment_status', 'pending')
+        req = getattr(b, 'special_request', getattr(b, 'notes', '')) or ""
+        dt = timezone.now()
+        details = {}
+
+    c_name = b.name if (hasattr(b, 'name') and b.name) else (
+        getattr(b.user, 'name', None) or getattr(b.user, 'username', '') if getattr(b, 'user', None) else ''
+    )
+    c_email = b.email if (hasattr(b, 'email') and b.email) else (
+        getattr(b.user, 'email', '') if getattr(b, 'user', None) else ''
+    )
+    c_phone = b.phone if (hasattr(b, 'phone') and b.phone) else (
+        getattr(b.user, 'phone', '') if getattr(b, 'user', None) else ''
+    )
+
+    created_iso = b.created_at.isoformat() if (hasattr(b, 'created_at') and b.created_at) else None
+
+    return {
+        "id": b.id,
+        "booking_id": b.booking_id,
+        "service_type": svc_type,
+        "service_name": svc_name,
+        "client_name": c_name or "Guest",
+        "client_email": c_email,
+        "client_phone": c_phone,
+        "user_id": b.user_id if getattr(b, 'user_id', None) else (b.user.id if getattr(b, 'user', None) else None),
+        "date": b_date,
+        "time": b_time,
+        "end_time": end_time,
+        "guests": guests,
+        "status": status_val,
+        "payment_status": payment_val,
+        "total_price": price,
+        "special_request": req,
+        "created_at": created_iso,
+        "access_code": b.booking_id,
+        "details": details,
+        "_sort_created_at": b.created_at if (hasattr(b, 'created_at') and b.created_at) else dt,
+        "_sort_datetime": dt,
+    }
+
+
+def find_booking_by_id(booking_id):
+    """
+    Finds a booking across any of the 6 booking models by booking_id.
+    Returns (booking_instance, model_class, service_type).
+    """
+    if not booking_id:
+        return None, None, None
+
+    bid = str(booking_id).strip()
+    prefix = bid.upper().split('-')[0] if '-' in bid else ''
+
+    if prefix in ['PS', 'SS', 'SB']:
+        b = SaunaBooking.objects.filter(booking_id__iexact=bid).first()
+        if b:
+            return b, SaunaBooking, 'sauna'
+    elif prefix in ['LR', 'LB']:
+        b = LunchroomBooking.objects.filter(booking_id__iexact=bid).first()
+        if b:
+            return b, LunchroomBooking, 'lunchroom'
+    elif prefix == 'ACT':
+        b = ActivityBooking.objects.filter(booking_id__iexact=bid).first()
+        if b:
+            return b, ActivityBooking, 'activity'
+    elif prefix == 'SR':
+        b = SaltRoomBooking.objects.filter(booking_id__iexact=bid).first()
+        if b:
+            return b, SaltRoomBooking, 'saltroom'
+    elif prefix == 'PKG':
+        b = PackageBooking.objects.filter(booking_id__iexact=bid).first()
+        if b:
+            return b, PackageBooking, 'package'
+    elif prefix in ['EVNT', 'EVT']:
+        b = EventBooking.objects.filter(booking_id__iexact=bid).first()
+        if b:
+            return b, EventBooking, 'event'
+
+    # Fallback search across all models
+    b = SaunaBooking.objects.filter(booking_id__iexact=bid).first()
+    if b: return b, SaunaBooking, 'sauna'
+    b = LunchroomBooking.objects.filter(booking_id__iexact=bid).first()
+    if b: return b, LunchroomBooking, 'lunchroom'
+    b = ActivityBooking.objects.filter(booking_id__iexact=bid).first()
+    if b: return b, ActivityBooking, 'activity'
+    b = SaltRoomBooking.objects.filter(booking_id__iexact=bid).first()
+    if b: return b, SaltRoomBooking, 'saltroom'
+    b = PackageBooking.objects.filter(booking_id__iexact=bid).first()
+    if b: return b, PackageBooking, 'package'
+    b = EventBooking.objects.filter(booking_id__iexact=bid).first()
+    if b: return b, EventBooking, 'event'
+
+    return None, None, None
+
+
+class AdminBookingsView(APIView):
+    """
+    Admin Bookings API providing comprehensive listing, search, filtering, and pagination
+    across all services: Sauna, Lunchroom, Activity, Salt Room, Package, and Event.
+
+    Capabilities:
+    1. Search:
+       - Client name
+       - Client email
+       - Booking ID (e.g. PS-0001, SR-0002)
+       - Service name / title
+    2. Filters:
+       - service_type (sauna, private_sauna, shared_sauna, lunchroom, activity, saltroom, package, event, all)
+       - date (exact booking date: YYYY-MM-DD or 'today')
+       - start_date / date_from (booking date from: YYYY-MM-DD)
+       - end_date / date_to (booking date to: YYYY-MM-DD)
+       - status (pending, confirmed, cancelled)
+       - payment_status (pending, paid, paid_with_package)
+    3. Pagination:
+       - page (default: 1)
+       - page_size (default: 10, max: 100)
+    4. Single booking detail:
+       - Query parameter `?booking_id=...` or URL path `admin/bookings/<booking_id>/`
+    5. Booking update:
+       - PATCH / PUT to update `status` and `payment_status`
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Admin Bookings"],
+        summary="List all bookings with search, filter, and pagination",
+        description="Search bookings across all services by client name, email, booking ID, or service name with date and status filters.",
+        parameters=[
+            OpenApiParameter(name="search", description="Search keyword across Client Name, Email, Phone, Booking ID, and Service Name", required=False, type=str),
+            OpenApiParameter(name="service_type", description="Filter by service type: sauna, private_sauna, shared_sauna, lunchroom, activity, saltroom, package, event, all", required=False, type=str),
+            OpenApiParameter(name="date", description="Exact booking visit date (YYYY-MM-DD or 'today')", required=False, type=str),
+            OpenApiParameter(name="start_date", description="Filter booking dates starting from this date (YYYY-MM-DD)", required=False, type=str),
+            OpenApiParameter(name="end_date", description="Filter booking dates up to this date (YYYY-MM-DD)", required=False, type=str),
+            OpenApiParameter(name="status", description="Filter by booking status: pending, confirmed, cancelled", required=False, type=str),
+            OpenApiParameter(name="payment_status", description="Filter by payment status: pending, paid, paid_with_package", required=False, type=str),
+            OpenApiParameter(name="booking_id", description="Direct filter by booking ID", required=False, type=str),
+            OpenApiParameter(name="client_name", description="Direct filter by client name", required=False, type=str),
+            OpenApiParameter(name="email", description="Direct filter by client email", required=False, type=str),
+            OpenApiParameter(name="ordering", description="Sorting field: -created_at (default), created_at, -date, date, -total_price, total_price", required=False, type=str),
+            OpenApiParameter(name="page", description="Page number (default: 1)", required=False, type=int),
+            OpenApiParameter(name="page_size", description="Number of results per page (default: 10, max: 100)", required=False, type=int),
+        ],
+        responses={200: AdminBookingsPaginationResponseSerializer},
+    )
+    def get(self, request, booking_id=None):
+        # 1. Single Booking Detail Lookup
+        b_id = booking_id or request.query_params.get('booking_id')
+        if b_id and not request.query_params.get('search'):
+            booking_obj, model_cls, svc_type = find_booking_by_id(b_id)
+            if not booking_obj:
+                return Response({
+                    "success": False,
+                    "message": f"Booking '{b_id}' not found."
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            item = serialize_admin_booking_item(booking_obj, svc_type)
+            item.pop('_sort_created_at', None)
+            item.pop('_sort_datetime', None)
+            return Response({
+                "success": True,
+                "data": item
+            }, status=status.HTTP_200_OK)
+
+        # 2. Extract Query Parameters
+        search = (request.query_params.get('search') or request.query_params.get('q') or '').strip()
+        search_lower = search.lower()
+
+        raw_service_type = (request.query_params.get('service_type') or request.query_params.get('service') or '').strip().lower()
+        status_filter = (request.query_params.get('status') or '').strip().lower()
+        payment_filter = (request.query_params.get('payment_status') or '').strip().lower()
+        booking_id_filter = (request.query_params.get('booking_id') or '').strip()
+        name_filter = (request.query_params.get('client_name') or request.query_params.get('name') or '').strip()
+        email_filter = (request.query_params.get('email') or '').strip()
+
+        exact_date = parse_date_safe(request.query_params.get('date'))
+        start_date = parse_date_safe(request.query_params.get('start_date') or request.query_params.get('date_from'))
+        end_date = parse_date_safe(request.query_params.get('end_date') or request.query_params.get('date_to'))
+
+        # Determine which models to query
+        query_all = raw_service_type in ['', 'all']
+        include_sauna = query_all or raw_service_type in ['sauna', 'saunas', 'private_sauna', 'shared_sauna', 'private-sauna', 'shared-sauna']
+        include_lunchroom = query_all or raw_service_type in ['lunchroom', 'lunchrooms']
+        include_activity = query_all or raw_service_type in ['activity', 'activities']
+        include_saltroom = query_all or raw_service_type in ['saltroom', 'saltrooms', 'salt-room', 'salt_room']
+        include_package = query_all or raw_service_type in ['package', 'packages']
+        include_event = query_all or raw_service_type in ['event', 'events']
+
+        all_bookings = []
+
+        # 3. Query Sauna Bookings
+        if include_sauna:
+            qs = SaunaBooking.objects.select_related('user').all()
+            if raw_service_type in ['private_sauna', 'private-sauna']:
+                qs = qs.filter(sauna_type='private')
+            elif raw_service_type in ['shared_sauna', 'shared-sauna']:
+                qs = qs.filter(sauna_type='shared')
+
+            if status_filter:
+                qs = qs.filter(status__iexact=status_filter)
+            if payment_filter:
+                qs = qs.filter(payment_status__iexact=payment_filter)
+            if booking_id_filter:
+                qs = qs.filter(booking_id__icontains=booking_id_filter)
+            if name_filter:
+                qs = qs.filter(Q(name__icontains=name_filter) | Q(user__name__icontains=name_filter))
+            if email_filter:
+                qs = qs.filter(Q(email__icontains=email_filter) | Q(user__email__icontains=email_filter))
+
+            if exact_date:
+                qs = qs.filter(booking_date=exact_date)
+            if start_date:
+                qs = qs.filter(booking_date__gte=start_date)
+            if end_date:
+                qs = qs.filter(booking_date__lte=end_date)
+
+            if search:
+                if search_lower in ['sauna', 'saunas', 'private sauna', 'shared sauna']:
+                    pass
+                else:
+                    qs = qs.filter(
+                        Q(booking_id__icontains=search) |
+                        Q(name__icontains=search) |
+                        Q(email__icontains=search) |
+                        Q(phone__icontains=search) |
+                        Q(sauna_type__icontains=search) |
+                        Q(user__name__icontains=search) |
+                        Q(user__email__icontains=search)
+                    )
+
+            for b in qs:
+                all_bookings.append(serialize_admin_booking_item(b, 'sauna'))
+
+        # 4. Query Lunchroom Bookings
+        if include_lunchroom:
+            qs = LunchroomBooking.objects.select_related('user').all()
+            if status_filter:
+                qs = qs.filter(status__icontains=status_filter)
+            if booking_id_filter:
+                qs = qs.filter(booking_id__icontains=booking_id_filter)
+            if name_filter:
+                qs = qs.filter(Q(name__icontains=name_filter) | Q(name_of_celebrant__icontains=name_filter) | Q(user__name__icontains=name_filter))
+            if email_filter:
+                qs = qs.filter(Q(email__icontains=email_filter) | Q(user__email__icontains=email_filter))
+
+            if exact_date:
+                qs = qs.filter(booking_date=exact_date)
+            if start_date:
+                qs = qs.filter(booking_date__gte=start_date)
+            if end_date:
+                qs = qs.filter(booking_date__lte=end_date)
+
+            if search:
+                if search_lower in ['lunch', 'lunchroom', 'lunch room']:
+                    pass
+                else:
+                    qs = qs.filter(
+                        Q(booking_id__icontains=search) |
+                        Q(name__icontains=search) |
+                        Q(name_of_celebrant__icontains=search) |
+                        Q(email__icontains=search) |
+                        Q(phone__icontains=search) |
+                        Q(celebration_type__icontains=search) |
+                        Q(user__name__icontains=search) |
+                        Q(user__email__icontains=search)
+                    )
+
+            for b in qs:
+                all_bookings.append(serialize_admin_booking_item(b, 'lunchroom'))
+
+        # 5. Query Activity Bookings
+        if include_activity:
+            qs = ActivityBooking.objects.select_related('user', 'activity').all()
+            if status_filter:
+                qs = qs.filter(status__iexact=status_filter)
+            if payment_filter:
+                qs = qs.filter(payment_status__iexact=payment_filter)
+            if booking_id_filter:
+                qs = qs.filter(booking_id__icontains=booking_id_filter)
+            if name_filter:
+                qs = qs.filter(Q(name__icontains=name_filter) | Q(user__name__icontains=name_filter))
+            if email_filter:
+                qs = qs.filter(Q(email__icontains=email_filter) | Q(user__email__icontains=email_filter))
+
+            if exact_date:
+                qs = qs.filter(Q(activity__date=exact_date) | Q(activity__isnull=True, created_at__date=exact_date))
+            if start_date:
+                qs = qs.filter(Q(activity__date__gte=start_date) | Q(activity__isnull=True, created_at__date__gte=start_date))
+            if end_date:
+                qs = qs.filter(Q(activity__date__lte=end_date) | Q(activity__isnull=True, created_at__date__lte=end_date))
+
+            if search:
+                if search_lower in ['activity', 'activities']:
+                    pass
+                else:
+                    qs = qs.filter(
+                        Q(booking_id__icontains=search) |
+                        Q(name__icontains=search) |
+                        Q(email__icontains=search) |
+                        Q(phone__icontains=search) |
+                        Q(activity__title__icontains=search) |
+                        Q(user__name__icontains=search) |
+                        Q(user__email__icontains=search)
+                    )
+
+            for b in qs:
+                all_bookings.append(serialize_admin_booking_item(b, 'activity'))
+
+        # 6. Query Salt Room Bookings
+        if include_saltroom:
+            qs = SaltRoomBooking.objects.select_related('user').all()
+            if status_filter:
+                qs = qs.filter(status__iexact=status_filter)
+            if payment_filter:
+                qs = qs.filter(payment_status__iexact=payment_filter)
+            if booking_id_filter:
+                qs = qs.filter(booking_id__icontains=booking_id_filter)
+            if name_filter:
+                qs = qs.filter(Q(name__icontains=name_filter) | Q(user__name__icontains=name_filter))
+            if email_filter:
+                qs = qs.filter(Q(email__icontains=email_filter) | Q(user__email__icontains=email_filter))
+
+            if exact_date:
+                qs = qs.filter(date=exact_date)
+            if start_date:
+                qs = qs.filter(date__gte=start_date)
+            if end_date:
+                qs = qs.filter(date__lte=end_date)
+
+            if search:
+                if search_lower in ['salt', 'saltroom', 'salt room', 'halotherapy']:
+                    pass
+                else:
+                    qs = qs.filter(
+                        Q(booking_id__icontains=search) |
+                        Q(name__icontains=search) |
+                        Q(email__icontains=search) |
+                        Q(phone__icontains=search) |
+                        Q(user__name__icontains=search) |
+                        Q(user__email__icontains=search)
+                    )
+
+            for b in qs:
+                all_bookings.append(serialize_admin_booking_item(b, 'saltroom'))
+
+        # 7. Query Package Bookings
+        if include_package:
+            qs = PackageBooking.objects.select_related('user').all()
+            if status_filter:
+                qs = qs.filter(status__iexact=status_filter)
+            if payment_filter:
+                qs = qs.filter(payment_status__iexact=payment_filter)
+            if booking_id_filter:
+                qs = qs.filter(booking_id__icontains=booking_id_filter)
+            if name_filter:
+                qs = qs.filter(Q(name__icontains=name_filter) | Q(user__name__icontains=name_filter))
+            if email_filter:
+                qs = qs.filter(Q(email__icontains=email_filter) | Q(user__email__icontains=email_filter))
+
+            if exact_date:
+                qs = qs.filter(date=exact_date)
+            if start_date:
+                qs = qs.filter(date__gte=start_date)
+            if end_date:
+                qs = qs.filter(date__lte=end_date)
+
+            if search:
+                if search_lower in ['package', 'packages', 'pkg']:
+                    pass
+                else:
+                    qs = qs.filter(
+                        Q(booking_id__icontains=search) |
+                        Q(name__icontains=search) |
+                        Q(email__icontains=search) |
+                        Q(phone__icontains=search) |
+                        Q(user__name__icontains=search) |
+                        Q(user__email__icontains=search)
+                    )
+
+            for b in qs:
+                all_bookings.append(serialize_admin_booking_item(b, 'package'))
+
+        # 8. Query Event Bookings
+        if include_event:
+            qs = EventBooking.objects.select_related('user').all()
+            if status_filter:
+                qs = qs.filter(status__iexact=status_filter)
+            if booking_id_filter:
+                qs = qs.filter(booking_id__icontains=booking_id_filter)
+            if name_filter:
+                qs = qs.filter(Q(name__icontains=name_filter) | Q(user__name__icontains=name_filter))
+            if email_filter:
+                qs = qs.filter(Q(email__icontains=email_filter) | Q(user__email__icontains=email_filter))
+
+            if exact_date:
+                qs = qs.filter(date=exact_date)
+            if start_date:
+                qs = qs.filter(date__gte=start_date)
+            if end_date:
+                qs = qs.filter(date__lte=end_date)
+
+            if search:
+                if search_lower in ['event', 'events', 'special event']:
+                    pass
+                else:
+                    qs = qs.filter(
+                        Q(booking_id__icontains=search) |
+                        Q(name__icontains=search) |
+                        Q(email__icontains=search) |
+                        Q(phone__icontains=search) |
+                        Q(user__name__icontains=search) |
+                        Q(user__email__icontains=search)
+                    )
+
+            for b in qs:
+                all_bookings.append(serialize_admin_booking_item(b, 'event'))
+
+        # 9. Sorting
+        ordering = (request.query_params.get('ordering') or request.query_params.get('sort_by') or '-created_at').strip()
+
+        if ordering in ['created_at', '+created_at', 'oldest']:
+            all_bookings.sort(key=lambda x: str(x.get('_sort_created_at') or ''))
+        elif ordering in ['date', '+date', 'date_asc']:
+            all_bookings.sort(key=lambda x: (str(x.get('date') or ''), str(x.get('time') or '')))
+        elif ordering in ['-date', 'date_desc']:
+            all_bookings.sort(key=lambda x: (str(x.get('date') or ''), str(x.get('time') or '')), reverse=True)
+        elif ordering in ['total_price', '+total_price', 'price_asc']:
+            all_bookings.sort(key=lambda x: float(x.get('total_price') or 0))
+        elif ordering in ['-total_price', 'price_desc']:
+            all_bookings.sort(key=lambda x: float(x.get('total_price') or 0), reverse=True)
+        else:
+            # Default newest first
+            all_bookings.sort(key=lambda x: str(x.get('_sort_created_at') or ''), reverse=True)
+
+        # 10. Pagination
+        try:
+            page = max(1, int(request.query_params.get('page', 1)))
+        except (ValueError, TypeError):
+            page = 1
+
+        try:
+            page_size = max(1, min(100, int(request.query_params.get('page_size', request.query_params.get('limit', 10)))))
+        except (ValueError, TypeError):
+            page_size = 10
+
+        total_count = len(all_bookings)
+        total_pages = max(1, math.ceil(total_count / page_size)) if total_count > 0 else 1
+
+        if page > total_pages and total_count > 0:
+            page = total_pages
+
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated_items = all_bookings[start_idx:end_idx]
+
+        # Clean internal sort helper keys
+        for item in paginated_items:
+            item.pop('_sort_created_at', None)
+            item.pop('_sort_datetime', None)
+
+        return Response({
+            "success": True,
+            "count": total_count,
+            "total_pages": total_pages,
+            "current_page": page,
+            "page_size": page_size,
+            "has_next": page < total_pages,
+            "has_previous": page > 1,
+            "next_page": page + 1 if page < total_pages else None,
+            "previous_page": page - 1 if page > 1 else None,
+            "results": paginated_items,
+            "data": paginated_items,
+        }, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=["Admin Bookings"],
+        summary="Update booking status or payment status",
+        description="Updates booking status (pending, confirmed, cancelled) and/or payment status (pending, paid, paid_with_package) for any booking.",
+        request=AdminBookingStatusUpdateSerializer,
+        responses={200: AdminBookingDetailResponseSerializer},
+    )
+    def patch(self, request, booking_id=None):
+        b_id = booking_id or request.data.get('booking_id') or request.query_params.get('booking_id')
+        if not b_id:
+            return Response({
+                "success": False,
+                "message": "booking_id is required."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        booking_obj, model_cls, svc_type = find_booking_by_id(b_id)
+        if not booking_obj:
+            return Response({
+                "success": False,
+                "message": f"Booking '{b_id}' not found."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        updated_fields = []
+        new_status = request.data.get('status')
+        if new_status and hasattr(booking_obj, 'status'):
+            booking_obj.status = new_status
+            updated_fields.append('status')
+
+        new_payment = request.data.get('payment_status')
+        if new_payment and hasattr(booking_obj, 'payment_status'):
+            booking_obj.payment_status = new_payment
+            if hasattr(booking_obj, 'is_paid'):
+                booking_obj.is_paid = (new_payment in ['paid', 'paid_with_package'])
+                updated_fields.append('is_paid')
+            updated_fields.append('payment_status')
+
+        if updated_fields:
+            booking_obj.save(update_fields=updated_fields)
+        else:
+            booking_obj.save()
+
+        item = serialize_admin_booking_item(booking_obj, svc_type)
+        item.pop('_sort_created_at', None)
+        item.pop('_sort_datetime', None)
+
+        return Response({
+            "success": True,
+            "message": f"Booking '{b_id}' updated successfully.",
+            "data": item
+        }, status=status.HTTP_200_OK)
+
+    def put(self, request, booking_id=None):
+        return self.patch(request, booking_id)

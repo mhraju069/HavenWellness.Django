@@ -95,3 +95,58 @@ class UserDashboardResponseSerializer(serializers.Serializer):
     my_bookings = MyBookingsSectionSerializer()
     access_codes = AccessCodeSectionSerializer()
     profile = ProfileSectionSerializer()
+
+
+class AdminBookingItemSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False)
+    booking_id = serializers.CharField(help_text="Unique booking reference, e.g. PS-0001, SR-0002")
+    service_type = serializers.CharField(help_text="Type of service: sauna, lunchroom, activity, saltroom, package, event")
+    service_name = serializers.CharField(help_text="Display name of the booked service")
+    client_name = serializers.CharField(allow_null=True, required=False, help_text="Full name of client / celebrant")
+    client_email = serializers.CharField(allow_null=True, required=False, help_text="Email address of client")
+    client_phone = serializers.CharField(allow_null=True, required=False, help_text="Phone number of client")
+    user_id = serializers.IntegerField(allow_null=True, required=False, help_text="Linked user ID if registered user")
+    date = serializers.CharField(help_text="Booking appointment / visit date (YYYY-MM-DD)")
+    time = serializers.CharField(help_text="Booking start time (HH:MM)")
+    end_time = serializers.CharField(allow_null=True, required=False, help_text="Booking end time if applicable")
+    guests = serializers.IntegerField(default=1, help_text="Guest count / capacity")
+    status = serializers.CharField(help_text="Booking status: pending, confirmed, cancelled")
+    payment_status = serializers.CharField(help_text="Payment status: pending, paid, paid_with_package")
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Total price charged")
+    special_request = serializers.CharField(allow_null=True, required=False, allow_blank=True, help_text="Special requests or notes from client")
+    created_at = serializers.DateTimeField(required=False, allow_null=True, help_text="Creation timestamp")
+    access_code = serializers.CharField(required=False, allow_null=True, help_text="Access code for entry / check-in")
+    details = serializers.DictField(required=False, default=dict, help_text="Service-specific configuration and add-ons")
+
+
+class AdminBookingsPaginationResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    count = serializers.IntegerField(help_text="Total matching bookings count")
+    total_pages = serializers.IntegerField(help_text="Total pages available")
+    current_page = serializers.IntegerField(help_text="Current page index (1-based)")
+    page_size = serializers.IntegerField(help_text="Items returned per page")
+    has_next = serializers.BooleanField(help_text="Whether next page exists")
+    has_previous = serializers.BooleanField(help_text="Whether previous page exists")
+    next_page = serializers.IntegerField(allow_null=True, help_text="Next page number or null")
+    previous_page = serializers.IntegerField(allow_null=True, help_text="Previous page number or null")
+    results = AdminBookingItemSerializer(many=True, help_text="List of booking objects")
+    data = AdminBookingItemSerializer(many=True, required=False, help_text="Alias for results")
+
+
+class AdminBookingDetailResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    message = serializers.CharField(required=False)
+    data = AdminBookingItemSerializer()
+
+
+class AdminBookingStatusUpdateSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=['pending', 'confirmed', 'cancelled'],
+        required=False,
+        help_text="Update booking status"
+    )
+    payment_status = serializers.ChoiceField(
+        choices=['pending', 'paid', 'paid_with_package'],
+        required=False,
+        help_text="Update payment status"
+    )
