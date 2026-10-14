@@ -28,7 +28,18 @@ from .serializers import (
     AdminPaymentsResponseSerializer,
     MonthlyPaymentsSummarySerializer,
     ServicePaymentBreakdownItemSerializer,
-    AdminPaymentListItemSerializer
+    AdminPaymentListItemSerializer,
+    AdminAccessCodeItemSerializer,
+    AdminAccessCodesSummarySerializer,
+    AdminAccessCodesResponseSerializer,
+    AdminAccessCodeDetailResponseSerializer,
+    BlockDateItemSerializer,
+    BlockDateCreateUpdateSerializer,
+    SpecialOpeningDateItemSerializer,
+    SpecialOpeningDateCreateUpdateSerializer,
+    AdminDatesSummarySerializer,
+    AdminDatesOverviewResponseSerializer,
+    AdminDateActionResponseSerializer
 )
 
 
@@ -45,11 +56,13 @@ def parse_booking_datetime(b_date, b_time=None):
 
 def serialize_sauna_booking(b):
     dt = parse_booking_datetime(b.booking_date, b.booking_time)
+    s_disp = b.get_sauna_type_display() if hasattr(b, 'get_sauna_type_display') else b.sauna_type.title()
+    s_title = s_disp if 'sauna' in s_disp.lower() else f"{s_disp} Sauna"
     return {
         "id": b.id,
         "booking_id": b.booking_id,
         "service_type": "sauna",
-        "service_name": f"{b.get_sauna_type_display() if hasattr(b, 'get_sauna_type_display') else b.sauna_type.title()} Sauna",
+        "service_name": s_title,
         "date": b.booking_date.strftime("%Y-%m-%d"),
         "time": b.booking_time.strftime("%H:%M") if b.booking_time else "",
         "end_time": None,
@@ -443,7 +456,9 @@ from services.models import (
     SaltroomFeatures,
     Packages,
     PackageFeatures,
-    ServiceSettings
+    ServiceSettings,
+    BlockDate,
+    SpecialOpeningDate
 )
 
 
@@ -2009,13 +2024,595 @@ def parse_date_safe(date_str):
         return None
 
 
+def parse_time_safe(time_str):
+    """
+    Parses a time string in HH:MM or HH:MM:SS format to datetime.time.
+    """
+    if not time_str:
+        return None
+    s = str(time_str).strip()
+    for fmt in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(s, fmt).time()
+        except ValueError:
+            pass
+    return None
+
+
+def serialize_block_date(bd):
+    """
+    Serializes a BlockDate model instance with all database fields.
+    """
+    return {
+        "id": bd.id,
+        "date": bd.date.strftime("%Y-%m-%d") if bd.date else "",
+        "description": bd.description or "",
+        "created_at": bd.created_at.isoformat() if bd.created_at else None,
+        "updated_at": bd.updated_at.isoformat() if bd.updated_at else None,
+    }
+
+
+def serialize_special_opening_date(so):
+    """
+    Serializes a SpecialOpeningDate model instance with all database fields.
+    """
+    return {
+        "id": so.id,
+        "date": so.date.strftime("%Y-%m-%d") if so.date else "",
+        "open_time": so.open_time.strftime("%H:%M") if so.open_time else "",
+        "close_time": so.close_time.strftime("%H:%M") if so.close_time else "",
+        "description": so.description or "",
+        "created_at": so.created_at.isoformat() if so.created_at else None,
+        "updated_at": so.updated_at.isoformat() if so.updated_at else None,
+    }
+
+
+class AdminDatesOverviewView(APIView):
+    """
+    Admin Schedule Dates Overview API:
+    Returns both Blocked Dates and Special Opening Dates in a single unified response,
+    along with summary metrics and flexible date/month/year/search filtering.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Admin Dates Management"],
+        summary="Get all blocked dates and special opening dates",
+        description="Returns two sections: 'blocked_dates' and 'special_opening_dates' with all database fields and summary stats.",
+        parameters=[
+            OpenApiParameter(name="year", description="Filter by year (e.g. 2026)", required=False, type=int),
+            OpenApiParameter(name="month", description="Filter by month (1 - 12)", required=False, type=int),
+            OpenApiParameter(name="start_date", description="Filter from date (YYYY-MM-DD)", required=False, type=str),
+            OpenApiParameter(name="end_date", description="Filter to date (YYYY-MM-DD)", required=False, type=str),
+            OpenApiParameter(name="upcoming", description="Set to 'true' to only view dates from today onwards", required=False, type=bool),
+            OpenApiParameter(name="search", description="Search keyword in descriptions", required=False, type=str),
+        ],
+        responses={200: AdminDatesOverviewResponseSerializer},
+    )
+    def get(self, request):
+        today = timezone.now().date()
+
+        # Query parameters
+        year_param = request.query_params.get('year')
+        month_param = request.query_params.get('month')
+        start_date = parse_date_safe(request.query_params.get('start_date') or request.query_params.get('date_from'))
+        end_date = parse_date_safe(request.query_params.get('end_date') or request.query_params.get('date_to'))
+        upcoming = request.query_params.get('upcoming', '').strip().lower() in ['true', '1', 'yes']
+        search = (request.query_params.get('search') or request.query_params.get('q') or '').strip()
+
+        # Base QuerySets
+        block_qs = BlockDate.objects.all()
+        special_qs = SpecialOpeningDate.objects.all()
+
+        # Global stats before filters
+        total_blocked_all = block_qs.count()
+        total_special_all = special_qs.count()
+        upcoming_blocked_count = block_qs.filter(date__gte=today).count()
+        upcoming_special_count = special_qs.filter(date__gte=today).count()
+
+        # Apply date filters
+        if upcoming:
+            block_qs = block_qs.filter(date__gte=today)
+            special_qs = special_qs.filter(date__gte=today)
+
+        if year_param and str(year_param).isdigit():
+            block_qs = block_qs.filter(date__year=int(year_param))
+            special_qs = special_qs.filter(date__year=int(year_param))
+
+        if month_param and str(month_param).isdigit():
+            block_qs = block_qs.filter(date__month=int(month_param))
+            special_qs = special_qs.filter(date__month=int(month_param))
+
+        if start_date:
+            block_qs = block_qs.filter(date__gte=start_date)
+            special_qs = special_qs.filter(date__gte=start_date)
+
+        if end_date:
+            block_qs = block_qs.filter(date__lte=end_date)
+            special_qs = special_qs.filter(date__lte=end_date)
+
+        if search:
+            block_qs = block_qs.filter(description__icontains=search)
+            special_qs = special_qs.filter(description__icontains=search)
+
+        block_list = [serialize_block_date(bd) for bd in block_qs.order_by('date')]
+        special_list = [serialize_special_opening_date(so) for so in special_qs.order_by('date')]
+
+        return Response({
+            "success": True,
+            "summary": {
+                "total_blocked_dates": total_blocked_all,
+                "total_special_opening_dates": total_special_all,
+                "upcoming_blocked_dates": upcoming_blocked_count,
+                "upcoming_special_opening_dates": upcoming_special_count,
+            },
+            "blocked_dates": block_list,
+            "special_opening_dates": special_list,
+        }, status=status.HTTP_200_OK)
+
+
+class AdminBlockDateView(APIView):
+    """
+    Admin Block Date Management API:
+    - GET: List all blocked dates (with search/filters) or retrieve single entry by pk/id
+    - POST: Add a new blocked date
+    - PATCH / PUT: Update an existing blocked date
+    - DELETE: Delete a blocked date
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Admin Dates Management"],
+        summary="List blocked dates or get single blocked date",
+        parameters=[
+            OpenApiParameter(name="id", description="Blocked Date ID (to retrieve single)", required=False, type=int),
+            OpenApiParameter(name="search", description="Search description keyword", required=False, type=str),
+            OpenApiParameter(name="date", description="Filter exact date (YYYY-MM-DD)", required=False, type=str),
+            OpenApiParameter(name="upcoming", description="Filter upcoming dates only", required=False, type=bool),
+        ],
+        responses={200: BlockDateItemSerializer(many=True)},
+    )
+    def get(self, request, pk=None):
+        target_id = pk or request.query_params.get('id')
+        if target_id and str(target_id).isdigit():
+            bd = BlockDate.objects.filter(id=int(target_id)).first()
+            if not bd:
+                return Response({
+                    "success": False,
+                    "message": f"Blocked date with ID {target_id} not found."
+                }, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                "success": True,
+                "data": serialize_block_date(bd)
+            }, status=status.HTTP_200_OK)
+
+        qs = BlockDate.objects.all()
+
+        date_param = parse_date_safe(request.query_params.get('date'))
+        if date_param:
+            qs = qs.filter(date=date_param)
+
+        start_date = parse_date_safe(request.query_params.get('start_date') or request.query_params.get('date_from'))
+        if start_date:
+            qs = qs.filter(date__gte=start_date)
+
+        end_date = parse_date_safe(request.query_params.get('end_date') or request.query_params.get('date_to'))
+        if end_date:
+            qs = qs.filter(date__lte=end_date)
+
+        if request.query_params.get('upcoming', '').strip().lower() in ['true', '1', 'yes']:
+            qs = qs.filter(date__gte=timezone.now().date())
+
+        search = (request.query_params.get('search') or request.query_params.get('q') or '').strip()
+        if search:
+            qs = qs.filter(description__icontains=search)
+
+        qs = qs.order_by('date')
+        data = [serialize_block_date(b) for b in qs]
+
+        return Response({
+            "success": True,
+            "count": len(data),
+            "data": data,
+            "blocked_dates": data,
+        }, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=["Admin Dates Management"],
+        summary="Add a new blocked date",
+        request=BlockDateCreateUpdateSerializer,
+        responses={201: AdminDateActionResponseSerializer},
+    )
+    def post(self, request):
+        data = request.data
+        raw_date = data.get('date')
+        description = (data.get('description') or '').strip()
+
+        target_date = parse_date_safe(raw_date)
+        if not target_date:
+            return Response({
+                "success": False,
+                "message": "Valid date in YYYY-MM-DD format is required."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if not description:
+            return Response({
+                "success": False,
+                "message": "Field 'description' is required."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check for duplicate
+        existing = BlockDate.objects.filter(date=target_date).first()
+        if existing:
+            return Response({
+                "success": False,
+                "message": f"Date {target_date.strftime('%Y-%m-%d')} is already blocked (ID: {existing.id})."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        bd = BlockDate.objects.create(
+            date=target_date,
+            description=description
+        )
+
+        return Response({
+            "success": True,
+            "message": f"Date {target_date.strftime('%Y-%m-%d')} blocked successfully.",
+            "data": serialize_block_date(bd)
+        }, status=status.HTTP_201_CREATED)
+
+    @extend_schema(
+        tags=["Admin Dates Management"],
+        summary="Update a blocked date",
+        request=BlockDateCreateUpdateSerializer,
+        responses={200: AdminDateActionResponseSerializer},
+    )
+    def patch(self, request, pk=None):
+        target_id = pk or request.data.get('id') or request.query_params.get('id')
+        if not target_id or not str(target_id).isdigit():
+            return Response({
+                "success": False,
+                "message": "Blocked date ID is required."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        bd = BlockDate.objects.filter(id=int(target_id)).first()
+        if not bd:
+            return Response({
+                "success": False,
+                "message": f"Blocked date with ID {target_id} not found."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        data = request.data
+        if 'date' in data:
+            new_date = parse_date_safe(data['date'])
+            if not new_date:
+                return Response({
+                    "success": False,
+                    "message": "Invalid date format. Expected YYYY-MM-DD."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            duplicate = BlockDate.objects.filter(date=new_date).exclude(id=bd.id).first()
+            if duplicate:
+                return Response({
+                    "success": False,
+                    "message": f"Another blocked date already exists for {new_date.strftime('%Y-%m-%d')}."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            bd.date = new_date
+
+        if 'description' in data:
+            desc = str(data['description']).strip()
+            if not desc:
+                return Response({
+                    "success": False,
+                    "message": "Description cannot be empty."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            bd.description = desc
+
+        bd.save()
+
+        return Response({
+            "success": True,
+            "message": f"Blocked date for {bd.date.strftime('%Y-%m-%d')} updated successfully.",
+            "data": serialize_block_date(bd)
+        }, status=status.HTTP_200_OK)
+
+    def put(self, request, pk=None):
+        return self.patch(request, pk)
+
+    @extend_schema(
+        tags=["Admin Dates Management"],
+        summary="Delete a blocked date",
+        parameters=[
+            OpenApiParameter(name="id", description="Blocked Date ID to delete", required=False, type=int),
+        ],
+        responses={200: AdminDateActionResponseSerializer},
+    )
+    def delete(self, request, pk=None):
+        target_id = pk or request.data.get('id') or request.query_params.get('id')
+        if not target_id or not str(target_id).isdigit():
+            return Response({
+                "success": False,
+                "message": "Blocked date ID is required to delete."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        bd = BlockDate.objects.filter(id=int(target_id)).first()
+        if not bd:
+            return Response({
+                "success": False,
+                "message": f"Blocked date with ID {target_id} not found."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        deleted_id = bd.id
+        deleted_date = bd.date.strftime("%Y-%m-%d") if bd.date else ""
+        bd.delete()
+
+        return Response({
+            "success": True,
+            "message": f"Blocked date for {deleted_date} (ID: {deleted_id}) deleted successfully."
+        }, status=status.HTTP_200_OK)
+
+
+class AdminSpecialOpeningDateView(APIView):
+    """
+    Admin Special Opening Date Management API:
+    - GET: List all special opening dates (with search/filters) or retrieve single entry by pk/id
+    - POST: Add a new special opening date with custom opening & closing hours
+    - PATCH / PUT: Update an existing special opening date
+    - DELETE: Delete a special opening date
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Admin Dates Management"],
+        summary="List special opening dates or get single special opening date",
+        parameters=[
+            OpenApiParameter(name="id", description="Special Opening Date ID (to retrieve single)", required=False, type=int),
+            OpenApiParameter(name="search", description="Search description keyword", required=False, type=str),
+            OpenApiParameter(name="date", description="Filter exact date (YYYY-MM-DD)", required=False, type=str),
+            OpenApiParameter(name="upcoming", description="Filter upcoming dates only", required=False, type=bool),
+        ],
+        responses={200: SpecialOpeningDateItemSerializer(many=True)},
+    )
+    def get(self, request, pk=None):
+        target_id = pk or request.query_params.get('id')
+        if target_id and str(target_id).isdigit():
+            so = SpecialOpeningDate.objects.filter(id=int(target_id)).first()
+            if not so:
+                return Response({
+                    "success": False,
+                    "message": f"Special opening date with ID {target_id} not found."
+                }, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                "success": True,
+                "data": serialize_special_opening_date(so)
+            }, status=status.HTTP_200_OK)
+
+        qs = SpecialOpeningDate.objects.all()
+
+        date_param = parse_date_safe(request.query_params.get('date'))
+        if date_param:
+            qs = qs.filter(date=date_param)
+
+        start_date = parse_date_safe(request.query_params.get('start_date') or request.query_params.get('date_from'))
+        if start_date:
+            qs = qs.filter(date__gte=start_date)
+
+        end_date = parse_date_safe(request.query_params.get('end_date') or request.query_params.get('date_to'))
+        if end_date:
+            qs = qs.filter(date__lte=end_date)
+
+        if request.query_params.get('upcoming', '').strip().lower() in ['true', '1', 'yes']:
+            qs = qs.filter(date__gte=timezone.now().date())
+
+        search = (request.query_params.get('search') or request.query_params.get('q') or '').strip()
+        if search:
+            qs = qs.filter(description__icontains=search)
+
+        qs = qs.order_by('date')
+        data = [serialize_special_opening_date(s) for s in qs]
+
+        return Response({
+            "success": True,
+            "count": len(data),
+            "data": data,
+            "special_opening_dates": data,
+        }, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=["Admin Dates Management"],
+        summary="Add a new special opening date",
+        request=SpecialOpeningDateCreateUpdateSerializer,
+        responses={201: AdminDateActionResponseSerializer},
+    )
+    def post(self, request):
+        data = request.data
+        raw_date = data.get('date')
+        open_time_val = data.get('open_time')
+        close_time_val = data.get('close_time')
+        description = (data.get('description') or '').strip()
+
+        target_date = parse_date_safe(raw_date)
+        if not target_date:
+            return Response({
+                "success": False,
+                "message": "Valid date in YYYY-MM-DD format is required."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        open_t = parse_time_safe(open_time_val)
+        if not open_t:
+            return Response({
+                "success": False,
+                "message": "Valid open_time in HH:MM format is required (e.g. '10:00')."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        close_t = parse_time_safe(close_time_val)
+        if not close_t:
+            return Response({
+                "success": False,
+                "message": "Valid close_time in HH:MM format is required (e.g. '16:00')."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if open_t >= close_t:
+            return Response({
+                "success": False,
+                "message": f"close_time ({close_t.strftime('%H:%M')}) must be strictly after open_time ({open_t.strftime('%H:%M')})."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if not description:
+            return Response({
+                "success": False,
+                "message": "Field 'description' is required."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        existing = SpecialOpeningDate.objects.filter(date=target_date).first()
+        if existing:
+            return Response({
+                "success": False,
+                "message": f"A special opening date already exists for {target_date.strftime('%Y-%m-%d')} (ID: {existing.id})."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        so = SpecialOpeningDate.objects.create(
+            date=target_date,
+            open_time=open_t,
+            close_time=close_t,
+            description=description
+        )
+
+        return Response({
+            "success": True,
+            "message": f"Special opening date for {target_date.strftime('%Y-%m-%d')} added successfully.",
+            "data": serialize_special_opening_date(so)
+        }, status=status.HTTP_201_CREATED)
+
+    @extend_schema(
+        tags=["Admin Dates Management"],
+        summary="Update a special opening date",
+        request=SpecialOpeningDateCreateUpdateSerializer,
+        responses={200: AdminDateActionResponseSerializer},
+    )
+    def patch(self, request, pk=None):
+        target_id = pk or request.data.get('id') or request.query_params.get('id')
+        if not target_id or not str(target_id).isdigit():
+            return Response({
+                "success": False,
+                "message": "Special opening date ID is required."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        so = SpecialOpeningDate.objects.filter(id=int(target_id)).first()
+        if not so:
+            return Response({
+                "success": False,
+                "message": f"Special opening date with ID {target_id} not found."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        data = request.data
+        if 'date' in data:
+            new_date = parse_date_safe(data['date'])
+            if not new_date:
+                return Response({
+                    "success": False,
+                    "message": "Invalid date format. Expected YYYY-MM-DD."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            dup = SpecialOpeningDate.objects.filter(date=new_date).exclude(id=so.id).first()
+            if dup:
+                return Response({
+                    "success": False,
+                    "message": f"Another special opening date already exists for {new_date.strftime('%Y-%m-%d')}."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            so.date = new_date
+
+        current_open = so.open_time
+        current_close = so.close_time
+
+        if 'open_time' in data:
+            new_open = parse_time_safe(data['open_time'])
+            if not new_open:
+                return Response({
+                    "success": False,
+                    "message": "Invalid open_time format. Expected HH:MM."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            current_open = new_open
+
+        if 'close_time' in data:
+            new_close = parse_time_safe(data['close_time'])
+            if not new_close:
+                return Response({
+                    "success": False,
+                    "message": "Invalid close_time format. Expected HH:MM."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            current_close = new_close
+
+        if current_open >= current_close:
+            return Response({
+                "success": False,
+                "message": f"close_time ({current_close.strftime('%H:%M')}) must be strictly after open_time ({current_open.strftime('%H:%M')})."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        so.open_time = current_open
+        so.close_time = current_close
+
+        if 'description' in data:
+            desc = str(data['description']).strip()
+            if not desc:
+                return Response({
+                    "success": False,
+                    "message": "Description cannot be empty."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            so.description = desc
+
+        so.save()
+
+        return Response({
+            "success": True,
+            "message": f"Special opening date for {so.date.strftime('%Y-%m-%d')} updated successfully.",
+            "data": serialize_special_opening_date(so)
+        }, status=status.HTTP_200_OK)
+
+    def put(self, request, pk=None):
+        return self.patch(request, pk)
+
+    @extend_schema(
+        tags=["Admin Dates Management"],
+        summary="Delete a special opening date",
+        parameters=[
+            OpenApiParameter(name="id", description="Special Opening Date ID to delete", required=False, type=int),
+        ],
+        responses={200: AdminDateActionResponseSerializer},
+    )
+    def delete(self, request, pk=None):
+        target_id = pk or request.data.get('id') or request.query_params.get('id')
+        if not target_id or not str(target_id).isdigit():
+            return Response({
+                "success": False,
+                "message": "Special opening date ID is required to delete."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        so = SpecialOpeningDate.objects.filter(id=int(target_id)).first()
+        if not so:
+            return Response({
+                "success": False,
+                "message": f"Special opening date with ID {target_id} not found."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        deleted_id = so.id
+        deleted_date = so.date.strftime("%Y-%m-%d") if so.date else ""
+        so.delete()
+
+        return Response({
+            "success": True,
+            "message": f"Special opening date for {deleted_date} (ID: {deleted_id}) deleted successfully."
+        }, status=status.HTTP_200_OK)
+
+
+
 def serialize_admin_booking_item(b, service_type=None):
     """
     Standardized serializer for admin booking list & detail view across all 6 booking models.
     """
     if isinstance(b, SaunaBooking) or service_type == 'sauna':
         svc_type = 'sauna'
-        svc_name = f"{b.get_sauna_type_display() if hasattr(b, 'get_sauna_type_display') else b.sauna_type.title()} Sauna"
+        s_disp = b.get_sauna_type_display() if hasattr(b, 'get_sauna_type_display') else b.sauna_type.title()
+        svc_name = s_disp if 'sauna' in s_disp.lower() else f"{s_disp} Sauna"
         b_date = b.booking_date.strftime("%Y-%m-%d") if b.booking_date else ""
         b_time = b.booking_time.strftime("%H:%M") if b.booking_time else ""
         end_time = None
@@ -3158,3 +3755,230 @@ class AdminPaymentsView(APIView):
             "results": paginated_items,
             "data": paginated_items,
         }, status=status.HTTP_200_OK)
+
+
+class AdminAccessCodesView(APIView):
+    """
+    Dedicated Admin API for Access Codes:
+    Returns Private Sauna and Shared Sauna bookings along with their generated access codes,
+    complete booking & client details, date/type filtering, search, and pagination.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Admin Access Codes"],
+        summary="List all sauna access codes with search, filter, and pagination",
+        description="Returns all Private Sauna and Shared Sauna bookings with access codes (booking_id), client details, date filters, search, and pagination.",
+        parameters=[
+            OpenApiParameter(name="search", description="Search keyword across Access Code, Booking ID, Client Name, Email, and Phone", required=False, type=str),
+            OpenApiParameter(name="sauna_type", description="Filter by sauna type: 'private', 'shared', or 'all'", required=False, type=str),
+            OpenApiParameter(name="date", description="Exact booking visit date (YYYY-MM-DD or 'today')", required=False, type=str),
+            OpenApiParameter(name="start_date", description="Filter visit dates starting from this date (YYYY-MM-DD)", required=False, type=str),
+            OpenApiParameter(name="end_date", description="Filter visit dates up to this date (YYYY-MM-DD)", required=False, type=str),
+            OpenApiParameter(name="status", description="Filter by booking status: pending, confirmed, cancelled", required=False, type=str),
+            OpenApiParameter(name="payment_status", description="Filter by payment status: pending, paid, paid_with_package", required=False, type=str),
+            OpenApiParameter(name="access_code", description="Direct filter by Access Code / Booking ID", required=False, type=str),
+            OpenApiParameter(name="booking_id", description="Direct filter by Booking ID", required=False, type=str),
+            OpenApiParameter(name="client_name", description="Direct filter by client name", required=False, type=str),
+            OpenApiParameter(name="email", description="Direct filter by client email", required=False, type=str),
+            OpenApiParameter(name="ordering", description="Sorting field: -booking_date (default), booking_date, -created_at, created_at, status", required=False, type=str),
+            OpenApiParameter(name="page", description="Page number (default: 1)", required=False, type=int),
+            OpenApiParameter(name="page_size", description="Number of results per page (default: 10, max: 100)", required=False, type=int),
+        ],
+        responses={200: AdminAccessCodesResponseSerializer},
+    )
+    def get(self, request, access_code=None):
+        # 1. Single Access Code detail lookup
+        target_code = access_code or request.query_params.get('access_code') or request.query_params.get('booking_id')
+        if target_code and not request.query_params.get('search'):
+            code_str = str(target_code).strip()
+            booking = SaunaBooking.objects.select_related('user').filter(
+                Q(booking_id__iexact=code_str)
+            ).first()
+
+            if not booking:
+                return Response({
+                    "success": False,
+                    "message": f"Sauna access code '{code_str}' not found."
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            item = self._serialize_item(booking)
+            return Response({
+                "success": True,
+                "data": item
+            }, status=status.HTTP_200_OK)
+
+        # 2. Extract Query Parameters
+        search = (request.query_params.get('search') or request.query_params.get('q') or '').strip()
+        search_lower = search.lower()
+
+        sauna_type_filter = (request.query_params.get('sauna_type') or request.query_params.get('type') or '').strip().lower()
+        status_filter = (request.query_params.get('status') or '').strip().lower()
+        payment_filter = (request.query_params.get('payment_status') or '').strip().lower()
+        code_filter = (request.query_params.get('access_code') or request.query_params.get('booking_id') or '').strip()
+        name_filter = (request.query_params.get('client_name') or request.query_params.get('name') or '').strip()
+        email_filter = (request.query_params.get('email') or '').strip()
+
+        exact_date = parse_date_safe(request.query_params.get('date'))
+        start_date = parse_date_safe(request.query_params.get('start_date') or request.query_params.get('date_from'))
+        end_date = parse_date_safe(request.query_params.get('end_date') or request.query_params.get('date_to'))
+
+        # 3. Base Queryset for Sauna Bookings (Private & Shared)
+        qs = SaunaBooking.objects.select_related('user').all()
+
+        # Overall summary counts before filters
+        total_all_codes = qs.count()
+        total_private = qs.filter(sauna_type='private').count()
+        total_shared = qs.filter(sauna_type='shared').count()
+        total_confirmed = qs.filter(status='confirmed').count()
+
+        summary_data = {
+            "total_codes": total_all_codes,
+            "private_sauna_codes": total_private,
+            "shared_sauna_codes": total_shared,
+            "confirmed_codes": total_confirmed,
+        }
+
+        # Apply Filters
+        if sauna_type_filter in ['private', 'private_sauna', 'private-sauna']:
+            qs = qs.filter(sauna_type='private')
+        elif sauna_type_filter in ['shared', 'shared_sauna', 'shared-sauna']:
+            qs = qs.filter(sauna_type='shared')
+
+        if status_filter and status_filter != 'all':
+            qs = qs.filter(status__iexact=status_filter)
+
+        if payment_filter and payment_filter != 'all':
+            qs = qs.filter(payment_status__iexact=payment_filter)
+
+        if code_filter:
+            qs = qs.filter(booking_id__icontains=code_filter)
+
+        if name_filter:
+            qs = qs.filter(Q(name__icontains=name_filter) | Q(user__name__icontains=name_filter))
+
+        if email_filter:
+            qs = qs.filter(Q(email__icontains=email_filter) | Q(user__email__icontains=email_filter))
+
+        if exact_date:
+            qs = qs.filter(booking_date=exact_date)
+        if start_date:
+            qs = qs.filter(booking_date__gte=start_date)
+        if end_date:
+            qs = qs.filter(booking_date__lte=end_date)
+
+        if search:
+            if search_lower in ['private sauna', 'private']:
+                qs = qs.filter(sauna_type='private')
+            elif search_lower in ['shared sauna', 'shared']:
+                qs = qs.filter(sauna_type='shared')
+            elif search_lower in ['sauna', 'saunas']:
+                pass  # All records are sauna bookings
+            else:
+                qs = qs.filter(
+                    Q(booking_id__icontains=search) |
+                    Q(name__icontains=search) |
+                    Q(email__icontains=search) |
+                    Q(phone__icontains=search) |
+                    Q(sauna_type__icontains=search) |
+                    Q(user__name__icontains=search) |
+                    Q(user__email__icontains=search)
+                )
+
+        # 4. Sorting
+        ordering = (request.query_params.get('ordering') or request.query_params.get('sort_by') or '-booking_date').strip()
+        valid_orderings = {
+            'booking_date': ['booking_date', 'booking_time'],
+            '-booking_date': ['-booking_date', '-booking_time'],
+            'date': ['booking_date', 'booking_time'],
+            '-date': ['-booking_date', '-booking_time'],
+            'created_at': ['created_at'],
+            '-created_at': ['-created_at'],
+            'status': ['status'],
+            'sauna_type': ['sauna_type'],
+        }
+        order_fields = valid_orderings.get(ordering, ['-booking_date', '-booking_time'])
+        qs = qs.order_by(*order_fields)
+
+        # 5. Pagination
+        total_count = qs.count()
+
+        try:
+            page = max(1, int(request.query_params.get('page', 1)))
+        except (ValueError, TypeError):
+            page = 1
+
+        try:
+            page_size = max(1, min(100, int(request.query_params.get('page_size', request.query_params.get('limit', 10)))))
+        except (ValueError, TypeError):
+            page_size = 10
+
+        total_pages = max(1, math.ceil(total_count / page_size)) if total_count > 0 else 1
+        if page > total_pages and total_count > 0:
+            page = total_pages
+
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated_qs = qs[start_idx:end_idx]
+
+        results = [self._serialize_item(b) for b in paginated_qs]
+
+        return Response({
+            "success": True,
+            "summary": summary_data,
+            "count": total_count,
+            "total_pages": total_pages,
+            "current_page": page,
+            "page_size": page_size,
+            "has_next": page < total_pages,
+            "has_previous": page > 1,
+            "next_page": page + 1 if page < total_pages else None,
+            "previous_page": page - 1 if page > 1 else None,
+            "results": results,
+            "data": results,
+        }, status=status.HTTP_200_OK)
+
+    def _serialize_item(self, b):
+        s_disp = b.get_sauna_type_display() if hasattr(b, 'get_sauna_type_display') else b.sauna_type.title()
+        svc_name = s_disp if 'sauna' in s_disp.lower() else f"{s_disp} Sauna"
+        c_name = b.name if (hasattr(b, 'name') and b.name) else (
+            getattr(b.user, 'name', None) or getattr(b.user, 'username', '') if getattr(b, 'user', None) else ''
+        )
+        c_email = b.email if (hasattr(b, 'email') and b.email) else (
+            getattr(b.user, 'email', '') if getattr(b, 'user', None) else ''
+        )
+        c_phone = b.phone if (hasattr(b, 'phone') and b.phone) else (
+            getattr(b.user, 'phone', '') if getattr(b, 'user', None) else ''
+        )
+
+        features = b.get_feature_names() if hasattr(b, 'get_feature_names') else (b.selected_features or [])
+
+        return {
+            "id": b.id,
+            "booking_id": b.booking_id,
+            "access_code": b.booking_id,
+            "sauna_type": b.sauna_type,
+            "service_name": svc_name,
+            "client_name": c_name or "Guest",
+            "client_email": c_email,
+            "client_phone": c_phone,
+            "user_id": b.user_id if getattr(b, 'user_id', None) else (b.user.id if getattr(b, 'user', None) else None),
+            "date": b.booking_date.strftime("%Y-%m-%d") if b.booking_date else "",
+            "time": b.booking_time.strftime("%H:%M") if b.booking_time else "",
+            "time_slot": b.time_slot,
+            "guests": b.capacity,
+            "status": b.status,
+            "payment_status": b.payment_status,
+            "total_price": str(b.total_price),
+            "special_request": b.special_request or "",
+            "selected_features": features,
+            "created_at": b.created_at.isoformat() if b.created_at else None,
+            "details": {
+                "sauna_type": b.sauna_type,
+                "time_slot": b.time_slot,
+                "capacity": b.capacity,
+                "selected_features": features,
+                "special_request": b.special_request or "",
+                "total_price": str(b.total_price),
+            }
+        }

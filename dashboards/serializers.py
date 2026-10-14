@@ -204,3 +204,114 @@ class AdminPaymentsResponseSerializer(serializers.Serializer):
     previous_page = serializers.IntegerField(allow_null=True, help_text="Previous page number")
     results = AdminPaymentListItemSerializer(many=True, help_text="List of payment / booking items")
     data = AdminPaymentListItemSerializer(many=True, required=False, help_text="Alias for results")
+
+
+class AdminAccessCodeItemSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False)
+    booking_id = serializers.CharField(help_text="Unique booking ID reference, e.g. PS-0070, SS-0001")
+    access_code = serializers.CharField(help_text="Access code for entry/gate/sauna, e.g. PS-0070")
+    sauna_type = serializers.CharField(help_text="Type of sauna: 'private' or 'shared'")
+    service_name = serializers.CharField(help_text="Display title: 'Private Sauna' or 'Shared Sauna'")
+    client_name = serializers.CharField(allow_null=True, required=False, help_text="Full client name")
+    client_email = serializers.CharField(allow_null=True, required=False, help_text="Client email address")
+    client_phone = serializers.CharField(allow_null=True, required=False, help_text="Client phone number")
+    user_id = serializers.IntegerField(allow_null=True, required=False, help_text="Linked user ID")
+    date = serializers.CharField(help_text="Sauna booking date (YYYY-MM-DD)")
+    time = serializers.CharField(help_text="Sauna booking start time (HH:MM)")
+    time_slot = serializers.CharField(help_text="Time slot length, e.g. '3_hours', '4_hours', '90_mins'")
+    guests = serializers.IntegerField(default=1, help_text="Capacity / number of persons")
+    status = serializers.CharField(help_text="Booking status: pending, confirmed, cancelled")
+    payment_status = serializers.CharField(help_text="Payment status: pending, paid, paid_with_package")
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Total price charged")
+    special_request = serializers.CharField(allow_null=True, required=False, allow_blank=True, help_text="Special requests")
+    selected_features = serializers.ListField(child=serializers.CharField(), required=False, default=list, help_text="List of selected features/add-ons")
+    created_at = serializers.DateTimeField(required=False, allow_null=True, help_text="Booking creation timestamp")
+    details = serializers.DictField(required=False, default=dict, help_text="Detailed booking attributes")
+
+
+class AdminAccessCodesSummarySerializer(serializers.Serializer):
+    total_codes = serializers.IntegerField(help_text="Total access codes count")
+    private_sauna_codes = serializers.IntegerField(help_text="Total Private Sauna access codes")
+    shared_sauna_codes = serializers.IntegerField(help_text="Total Shared Sauna access codes")
+    confirmed_codes = serializers.IntegerField(help_text="Total confirmed active access codes")
+
+
+class AdminAccessCodesResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    summary = AdminAccessCodesSummarySerializer(help_text="High-level counts summary")
+    count = serializers.IntegerField(help_text="Total matching access codes count")
+    total_pages = serializers.IntegerField(help_text="Total pages available")
+    current_page = serializers.IntegerField(help_text="Current page index (1-based)")
+    page_size = serializers.IntegerField(help_text="Items returned per page")
+    has_next = serializers.BooleanField(help_text="Whether next page exists")
+    has_previous = serializers.BooleanField(help_text="Whether previous page exists")
+    next_page = serializers.IntegerField(allow_null=True, help_text="Next page number")
+    previous_page = serializers.IntegerField(allow_null=True, help_text="Previous page number")
+    results = AdminAccessCodeItemSerializer(many=True, help_text="List of sauna booking access codes")
+    data = AdminAccessCodeItemSerializer(many=True, required=False, help_text="Alias for results")
+
+
+class AdminAccessCodeDetailResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    data = AdminAccessCodeItemSerializer()
+
+
+# ============================================================================
+# Admin Dates Management Serializers (Blocked Dates & Special Opening Dates)
+# ============================================================================
+
+class BlockDateItemSerializer(serializers.Serializer):
+    id = serializers.IntegerField(help_text="Unique ID of the blocked date entry")
+    date = serializers.CharField(help_text="Blocked calendar date (YYYY-MM-DD)")
+    description = serializers.CharField(help_text="Reason or description for blocking this date")
+    created_at = serializers.DateTimeField(required=False, help_text="Creation timestamp")
+    updated_at = serializers.DateTimeField(required=False, help_text="Last update timestamp")
+
+
+class BlockDateCreateUpdateSerializer(serializers.Serializer):
+    date = serializers.DateField(format="%Y-%m-%d", input_formats=["%Y-%m-%d"], help_text="Date to block (YYYY-MM-DD)")
+    description = serializers.CharField(required=True, allow_blank=False, help_text="Reason for blocking this date")
+
+
+class SpecialOpeningDateItemSerializer(serializers.Serializer):
+    id = serializers.IntegerField(help_text="Unique ID of the special opening date entry")
+    date = serializers.CharField(help_text="Special opening date (YYYY-MM-DD)")
+    open_time = serializers.CharField(help_text="Facility opening time (HH:MM)")
+    close_time = serializers.CharField(help_text="Facility closing time (HH:MM)")
+    description = serializers.CharField(help_text="Reason or description for special opening hours")
+    created_at = serializers.DateTimeField(required=False, help_text="Creation timestamp")
+    updated_at = serializers.DateTimeField(required=False, help_text="Last update timestamp")
+
+
+class SpecialOpeningDateCreateUpdateSerializer(serializers.Serializer):
+    date = serializers.DateField(format="%Y-%m-%d", input_formats=["%Y-%m-%d"], help_text="Special opening date (YYYY-MM-DD)")
+    open_time = serializers.TimeField(format="%H:%M", input_formats=["%H:%M", "%H:%M:%S"], help_text="Opening time (HH:MM)")
+    close_time = serializers.TimeField(format="%H:%M", input_formats=["%H:%M", "%H:%M:%S"], help_text="Closing time (HH:MM)")
+    description = serializers.CharField(required=True, allow_blank=False, help_text="Reason or details for special opening hours")
+
+    def validate(self, data):
+        open_t = data.get('open_time')
+        close_t = data.get('close_time')
+        if open_t and close_t and open_t >= close_t:
+            raise serializers.ValidationError({"close_time": "close_time must be strictly after open_time."})
+        return data
+
+
+class AdminDatesSummarySerializer(serializers.Serializer):
+    total_blocked_dates = serializers.IntegerField(help_text="Total blocked dates count")
+    total_special_opening_dates = serializers.IntegerField(help_text="Total special opening dates count")
+    upcoming_blocked_dates = serializers.IntegerField(help_text="Upcoming blocked dates count from today onwards")
+    upcoming_special_opening_dates = serializers.IntegerField(help_text="Upcoming special opening dates count from today onwards")
+
+
+class AdminDatesOverviewResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    summary = AdminDatesSummarySerializer(help_text="Summary counters for dates")
+    blocked_dates = BlockDateItemSerializer(many=True, help_text="All blocked dates with all fields")
+    special_opening_dates = SpecialOpeningDateItemSerializer(many=True, help_text="All special opening dates with all fields")
+
+
+class AdminDateActionResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    message = serializers.CharField()
+    data = serializers.DictField(required=False)

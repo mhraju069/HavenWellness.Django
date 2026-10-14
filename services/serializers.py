@@ -136,3 +136,31 @@ class PackagesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Packages
         exclude = ['created_at', 'updated_at']
+
+
+# Dates Management Serializers
+class BlockDateSerializer(serializers.ModelSerializer):
+    date = serializers.DateField(format="%Y-%m-%d", input_formats=["%Y-%m-%d"])
+
+    class Meta:
+        model = BlockDate
+        fields = ['id', 'date', 'description', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class SpecialOpeningDateSerializer(serializers.ModelSerializer):
+    date = serializers.DateField(format="%Y-%m-%d", input_formats=["%Y-%m-%d"])
+    open_time = serializers.TimeField(format="%H:%M", input_formats=["%H:%M", "%H:%M:%S"])
+    close_time = serializers.TimeField(format="%H:%M", input_formats=["%H:%M", "%H:%M:%S"])
+
+    class Meta:
+        model = SpecialOpeningDate
+        fields = ['id', 'date', 'open_time', 'close_time', 'description', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate(self, data):
+        open_t = data.get('open_time') or (self.instance.open_time if self.instance else None)
+        close_t = data.get('close_time') or (self.instance.close_time if self.instance else None)
+        if open_t and close_t and open_t >= close_t:
+            raise serializers.ValidationError({"close_time": "close_time must be strictly after open_time."})
+        return data
