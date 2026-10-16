@@ -30,6 +30,8 @@ urlpatterns = [
     path('api/payments/', include('payments.urls')),
     path('stripe/', include('djstripe.urls', namespace='djstripe')),
     path('api/notify/', include('notifications.urls')),
+    path('api/others/', include('others.urls')),
+    path('api/contact/', include('others.urls')),
     path('', RedirectView.as_view(url='/api/docs/', permanent=False)),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

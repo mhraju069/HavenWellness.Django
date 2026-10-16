@@ -13,6 +13,12 @@ from .views import (
     AdminSpecialOpeningDateView,
 )
 from services.views import AllServicesView
+from others.views import (
+    ContactInfoView,
+    PrivacyPolicyView,
+    TermsAndConditionsView,
+    SupportMessageView,
+)
 
 urlpatterns = [
     path('', UserDashboardView.as_view(), name='user-dashboard-root'),
@@ -45,4 +51,11 @@ urlpatterns = [
     path('admin/services/dates/blocked/<int:pk>/', AdminBlockDateView.as_view(), name='admin-services-blocked-dates-detail'),
     path('admin/services/dates/special-openings/', AdminSpecialOpeningDateView.as_view(), name='admin-services-special-opening-dates'),
     path('admin/services/dates/special-openings/<int:pk>/', AdminSpecialOpeningDateView.as_view(), name='admin-services-special-opening-dates-detail'),
+
+    # Admin Contact, Legal & Support Messages
+    path('admin/contact-info/', ContactInfoView.as_view(), name='admin-contact-info'),
+    path('admin/privacy-policy/', PrivacyPolicyView.as_view(), name='admin-privacy-policy'),
+    path('admin/terms-and-conditions/', TermsAndConditionsView.as_view(), name='admin-terms-and-conditions'),
+    path('admin/support-messages/', SupportMessageView.as_view(), name='admin-support-messages'),
+    path('admin/support-messages/<int:pk>/', SupportMessageView.as_view(), name='admin-support-messages-detail'),
 ]
