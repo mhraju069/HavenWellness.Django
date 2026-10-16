@@ -242,6 +242,23 @@ class SessionPassListAPIView(APIView):
         serializer = SessionPassSerializer(passes, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(
+        tags=['Payments Admin'],
+        summary="Create a new Session Pass (Admin)",
+        request=SessionPassSerializer,
+        responses={201: SessionPassSerializer, 400: OpenApiTypes.OBJECT}
+    )
+    def post(self, request):
+        serializer = SessionPassSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "success": True,
+                "message": "Session pass created successfully.",
+                "data": serializer.data
+            }, status=status.HTTP_201_CREATED)
+        return Response({"success": False, "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
 
 @extend_schema(
     tags=['Payments'],
@@ -265,6 +282,135 @@ class SubscriptionPlanListAPIView(APIView):
             queryset = queryset.filter(plan_category=plan_category)
         serializer = SubscriptionPlansSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=['Payments Admin'],
+        summary="Create a new Subscription Plan (Admin)",
+        request=SubscriptionPlansSerializer,
+        responses={201: SubscriptionPlansSerializer, 400: OpenApiTypes.OBJECT}
+    )
+    def post(self, request):
+        serializer = SubscriptionPlansSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "success": True,
+                "message": "Subscription plan created successfully.",
+                "data": serializer.data
+            }, status=status.HTTP_201_CREATED)
+        return Response({"success": False, "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema(
+    tags=['Payments Admin'],
+    summary="Get, Update, or Delete a Subscription Plan (Admin)",
+    responses={200: SubscriptionPlansSerializer}
+)
+class SubscriptionPlanDetailAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get_object(self, pk):
+        try:
+            return SubscriptionPlans.objects.get(pk=pk)
+        except SubscriptionPlans.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        plan = self.get_object(pk)
+        if not plan:
+            return Response({"success": False, "message": "Subscription plan not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"success": True, "data": SubscriptionPlansSerializer(plan).data}, status=status.HTTP_200_OK)
+
+    def put(self, request, pk):
+        plan = self.get_object(pk)
+        if not plan:
+            return Response({"success": False, "message": "Subscription plan not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = SubscriptionPlansSerializer(plan, data=request.data, partial=False)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "success": True,
+                "message": "Subscription plan updated successfully.",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+        return Response({"success": False, "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, pk):
+        plan = self.get_object(pk)
+        if not plan:
+            return Response({"success": False, "message": "Subscription plan not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = SubscriptionPlansSerializer(plan, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "success": True,
+                "message": "Subscription plan updated successfully.",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+        return Response({"success": False, "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        plan = self.get_object(pk)
+        if not plan:
+            return Response({"success": False, "message": "Subscription plan not found."}, status=status.HTTP_404_NOT_FOUND)
+        plan.delete()
+        return Response({"success": True, "message": "Subscription plan deleted successfully."}, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    tags=['Payments Admin'],
+    summary="Get, Update, or Delete a Session Pass (Admin)",
+    responses={200: SessionPassSerializer}
+)
+class SessionPassDetailAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get_object(self, pk):
+        try:
+            return SessionPass.objects.get(pk=pk)
+        except SessionPass.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        sp = self.get_object(pk)
+        if not sp:
+            return Response({"success": False, "message": "Session pass not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"success": True, "data": SessionPassSerializer(sp).data}, status=status.HTTP_200_OK)
+
+    def put(self, request, pk):
+        sp = self.get_object(pk)
+        if not sp:
+            return Response({"success": False, "message": "Session pass not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = SessionPassSerializer(sp, data=request.data, partial=False)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "success": True,
+                "message": "Session pass updated successfully.",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+        return Response({"success": False, "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, pk):
+        sp = self.get_object(pk)
+        if not sp:
+            return Response({"success": False, "message": "Session pass not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = SessionPassSerializer(sp, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "success": True,
+                "message": "Session pass updated successfully.",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+        return Response({"success": False, "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        sp = self.get_object(pk)
+        if not sp:
+            return Response({"success": False, "message": "Session pass not found."}, status=status.HTTP_404_NOT_FOUND)
+        sp.delete()
+        return Response({"success": True, "message": "Session pass deleted successfully."}, status=status.HTTP_200_OK)
 
 
 @extend_schema(

@@ -11,10 +11,37 @@ class SubscriptionPlanFeaturesSerializer(serializers.ModelSerializer):
 
 class SubscriptionPlansSerializer(serializers.ModelSerializer):
     features = SubscriptionPlanFeaturesSerializer(many=True, read_only=True)
+    feature_list = serializers.ListField(
+        child=serializers.CharField(max_length=100),
+        write_only=True,
+        required=False,
+        help_text="Optional list of feature strings to set for this plan, e.g. ['Unlimited sauna', 'Free locker']"
+    )
 
     class Meta:
         model = SubscriptionPlans
         exclude = ['created_at', 'updated_at']
+
+    def create(self, validated_data):
+        feature_list = validated_data.pop('feature_list', None)
+        plan = SubscriptionPlans.objects.create(**validated_data)
+        if feature_list is not None:
+            for feat in feature_list:
+                if str(feat).strip():
+                    SubscriptionPlanFeatures.objects.create(subscription_plan=plan, feature=str(feat).strip())
+        return plan
+
+    def update(self, instance, validated_data):
+        feature_list = validated_data.pop('feature_list', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if feature_list is not None:
+            instance.features.all().delete()
+            for feat in feature_list:
+                if str(feat).strip():
+                    SubscriptionPlanFeatures.objects.create(subscription_plan=instance, feature=str(feat).strip())
+        return instance
 
 
 class SessionPassFeaturesSerializer(serializers.ModelSerializer):
@@ -25,10 +52,37 @@ class SessionPassFeaturesSerializer(serializers.ModelSerializer):
 
 class SessionPassSerializer(serializers.ModelSerializer):
     features = SessionPassFeaturesSerializer(many=True, read_only=True)
+    feature_list = serializers.ListField(
+        child=serializers.CharField(max_length=100),
+        write_only=True,
+        required=False,
+        help_text="Optional list of feature strings to set for this pass, e.g. ['10 sessions', 'Valid for 6 months']"
+    )
 
     class Meta:
         model = SessionPass
         exclude = ['created_at', 'updated_at']
+
+    def create(self, validated_data):
+        feature_list = validated_data.pop('feature_list', None)
+        session_pass = SessionPass.objects.create(**validated_data)
+        if feature_list is not None:
+            for feat in feature_list:
+                if str(feat).strip():
+                    SessionPassFeatures.objects.create(session_pass=session_pass, feature=str(feat).strip())
+        return session_pass
+
+    def update(self, instance, validated_data):
+        feature_list = validated_data.pop('feature_list', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if feature_list is not None:
+            instance.features.all().delete()
+            for feat in feature_list:
+                if str(feat).strip():
+                    SessionPassFeatures.objects.create(session_pass=instance, feature=str(feat).strip())
+        return instance
 
 
 class PaymentsSerializer(serializers.ModelSerializer):
