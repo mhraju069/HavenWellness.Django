@@ -25,8 +25,11 @@ def send_otp(email):
         email_from = settings.EMAIL_HOST_USER
         recipient_list = [email]
         
+        user_name = getattr(user, 'name', '') or getattr(user, 'username', '') or email.split('@')[0]
         html_message = render_to_string('email/otp_email.html', {
             'otp': otp_obj.otp,
+            'name': user_name,
+            'user': user,
         })
         plain_message = f"Your OTP for email verification is: {otp_obj.otp}"
         send_mail(subject, plain_message, email_from, recipient_list, html_message=html_message)

@@ -3,13 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Booking Confirmation</title>
+    <title>
+        {% if email_category == 'purchase' %}
+            {% if booking.purchase_type == 'session_pass' %}Pass Confirmation{% else %}Subscription Confirmation{% endif %}
+        {% elif email_category == 'package' %}
+            Package Confirmation
+        {% else %}
+            Booking Confirmation
+        {% endif %}
+    </title>
 </head>
 <body style="margin: 0; padding: 24px 16px; background-color: #ffffff; color: #111111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.6;">
 
     <div style="max-width: 540px; margin: 0 auto; background-color: #ffffff;">
         <h2 style="font-size: 20px; font-weight: 600; margin: 0 0 16px 0; color: #000000; border-bottom: 1px solid #e5e5e5; padding-bottom: 12px;">
-            Booking Confirmed
+            {% if email_category == 'purchase' %}
+                {% if booking.purchase_type == 'session_pass' %}
+                    Session Pass Confirmed
+                {% else %}
+                    Subscription Confirmed
+                {% endif %}
+            {% elif email_category == 'package' %}
+                Package Booking Confirmed
+            {% elif is_paid_with_package %}
+                Booking Confirmed (Included in Package)
+            {% else %}
+                Booking Confirmed
+            {% endif %}
         </h2>
 
         <p style="margin: 0 0 20px 0;">
@@ -17,34 +37,98 @@
         </p>
 
         <p style="margin: 0 0 20px 0;">
-            {% if is_paid_booking %}
-            Thank you for your booking. Your payment has been received and your reservation is confirmed. Here are the details:
+            {% if email_category == 'purchase' %}
+                {% if booking.purchase_type == 'session_pass' %}
+                    Thank you for purchasing your Session Pass. Your pass is now active and automatically linked to your account. You can use it to book your upcoming sessions online effortlessly.
+                {% else %}
+                    Thank you for subscribing. Your membership plan is active and linked to your account. You can now make your advance online session reservations.
+                {% endif %}
+            {% elif email_category == 'package' %}
+                Thank you for booking your Package Experience with us. Your package reservation and included services are confirmed. Here are the details:
+            {% elif is_paid_with_package %}
+                Your reservation has been confirmed as part of your Package Experience. No additional payment is required for this session.
+            {% elif is_paid_booking %}
+                Thank you for your booking. Your payment has been received and your reservation is confirmed. Here are the details:
             {% else %}
-            Thank you for your booking. Your reservation has been received and confirmed. Here are the details:
+                Thank you for your booking. Your reservation has been received and confirmed. Here are the details:
             {% endif %}
         </p>
 
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
             <tr>
-                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555; width: 40%;">Booking ID:</td>
-                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; font-weight: 600; color: #000000;">{{ booking.booking_id }}</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555; width: 40%;">
+                    {% if email_category == 'purchase' %}Purchase Reference:{% else %}Booking ID:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; font-weight: 600; color: #000000;">
+                    {% if booking.booking_id %}{{ booking.booking_id }}{% else %}{{ booking.purchase_id }}{% endif %}
+                </td>
             </tr>
+
             <tr>
                 <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Type:</td>
-                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ booking_type_display|title }}</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ booking_type_display }}</td>
             </tr>
+
+            {% if email_category == 'purchase' %}
+                {% if booking.purchase_type == 'session_pass' %}
+                    <tr>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Total Sessions:</td>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ purchase_info.total_sessions }} sessions</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Remaining Sessions:</td>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ purchase_info.remaining_sessions }} sessions</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Validity:</td>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ purchase_info.validity }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Plan Type:</td>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ purchase_info.plan_type|title }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Active Period:</td>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ purchase_info.validity }}</td>
+                    </tr>
+                {% endif %}
+            {% else %}
+                {% if booking_date_display %}
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Date:</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ booking_date_display }}</td>
+                </tr>
+                {% endif %}
+
+                {% if booking_time_display %}
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Time:</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ booking_time_display }}{% if time_slot_display %} ({{ time_slot_display }}){% endif %}</td>
+                </tr>
+                {% endif %}
+
+                {% if guests_count_display and email_category != 'purchase' %}
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Guests:</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ guests_count_display }}</td>
+                </tr>
+                {% endif %}
+            {% endif %}
+
+            {% if sub_services_list %}
             <tr>
-                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Date:</td>
-                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ booking_date_display }}</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555; vertical-align: top;">Included Services:</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">
+                    <ul style="margin: 0; padding-left: 18px;">
+                        {% for svc in sub_services_list %}
+                            <li>{{ svc }}</li>
+                        {% endfor %}
+                    </ul>
+                </td>
             </tr>
-            <tr>
-                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Time:</td>
-                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ booking_time_display }}{% if time_slot_display %} ({{ time_slot_display }}){% endif %}</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Guests:</td>
-                <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #000000;">{{ guests_count_display }}</td>
-            </tr>
+            {% endif %}
+
             {% if booking.get_feature_names %}
             <tr>
                 <td style="padding: 8px 0; border-bottom: 1px solid #eeeeee; color: #555555;">Add-ons:</td>
@@ -55,7 +139,13 @@
                 </td>
             </tr>
             {% endif %}
-            {% if booking.total_price %}
+
+            {% if is_paid_with_package %}
+            <tr>
+                <td style="padding: 10px 0; border-bottom: 2px solid #111111; font-weight: 600; color: #000000;">Payment:</td>
+                <td style="padding: 10px 0; border-bottom: 2px solid #111111; font-weight: 600; color: #000000;">Covered by Package (Paid)</td>
+            </tr>
+            {% elif booking.total_price %}
             <tr>
                 <td style="padding: 10px 0; border-bottom: 2px solid #111111; font-weight: 600; color: #000000;">Total Paid:</td>
                 <td style="padding: 10px 0; border-bottom: 2px solid #111111; font-weight: 600; color: #000000;">€{{ booking.total_price }}</td>
@@ -64,7 +154,11 @@
         </table>
 
         <p style="margin: 0 0 24px 0; color: #444444; font-size: 14px;">
-            Please arrive 10-15 minutes prior to your scheduled time. If you have any questions or need to make changes, please contact us.
+            {% if email_category == 'purchase' %}
+                You can manage your passes, check remaining sessions, and reserve slots at any time from your customer dashboard.
+            {% else %}
+                Please arrive 10-15 minutes prior to your scheduled time. If you have any questions or need to make changes, please contact us.
+            {% endif %}
         </p>
 
         <p style="margin: 0; color: #666666; font-size: 13px; border-top: 1px solid #e5e5e5; padding-top: 14px;">

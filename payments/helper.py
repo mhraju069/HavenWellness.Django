@@ -85,6 +85,10 @@ def send_booking_confirmation_email(booking):
         email_from = getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None)
         recipient_list = [booking.email]
 
+        email_category = 'booking'  # 'booking', 'purchase', or 'package'
+        sub_services_list = []
+        purchase_info = {}
+
         if hasattr(booking, 'activity') and booking.activity:
             booking_type_display = f"Activity: {booking.activity.title}"
             booking_date_display = str(booking.activity.date) if booking.activity.date else "Scheduled Date"
@@ -96,12 +100,14 @@ def send_booking_confirmation_email(booking):
             booking_time_display = str(booking.booking_time)
             time_slot_display = booking.get_time_slot_display() if hasattr(booking, 'get_time_slot_display') else str(getattr(booking, 'time_slot', ''))
         elif hasattr(booking, 'booked_services_ids') or (hasattr(booking, 'booking_id') and booking.booking_id.startswith('PKG-')):
-            booking_type_display = 'Package Booking' if not getattr(booking, 'is_custom', False) else 'Custom Package Request'
+            email_category = 'package'
+            is_custom = getattr(booking, 'is_custom', False)
+            booking_type_display = 'Custom Package Request' if is_custom else 'Package Experience'
             booking_date_display = str(booking.date)
-            booking_time_display = "Scheduled Services"
+            booking_time_display = "Included Package Services"
             time_slot_display = ""
             
-            from bookings.models import SaunaBooking, LunchroomBooking, ActivityBooking
+            from bookings.models import SaunaBooking, LunchroomBooking, ActivityBooking, SaltRoomBooking
 
             # Extract human-readable summary of included sub-services with time & full title
             services_summary = []
@@ -109,7 +115,6 @@ def send_booking_confirmation_email(booking):
             for item in raw_ids:
                 if isinstance(item, dict):
                     for service_type, ref_id in item.items():
-                        # Map service_type key to proper full name
                         if service_type in ['private', 'private_sauna']:
                             service_title = 'Private Sauna'
                         elif service_type in ['shared', 'shared_sauna']:
@@ -123,14 +128,12 @@ def send_booking_confirmation_email(booking):
                         else:
                             service_title = str(service_type).replace('_', ' ').title()
 
-                        # Lookup time from DB object
                         time_str = ""
                         if ref_id.startswith(('PS-', 'SS-', 'SB-')):
                             s_obj = SaunaBooking.objects.filter(booking_id=ref_id).first()
                             if s_obj and s_obj.booking_time:
                                 time_str = f" @ {s_obj.booking_time.strftime('%H:%M')}"
                         elif ref_id.startswith('SR-'):
-                            from bookings.models import SaltRoomBooking
                             sr_obj = SaltRoomBooking.objects.filter(booking_id=ref_id).first()
                             if sr_obj and sr_obj.start_time:
                                 end_str = f" - {sr_obj.end_time.strftime('%H:%M')}" if sr_obj.end_time else ""
@@ -144,19 +147,40 @@ def send_booking_confirmation_email(booking):
                             if a_obj and a_obj.activity and a_obj.activity.open_time:
                                 time_str = f" @ {a_obj.activity.open_time.strftime('%H:%M')}"
 
-                        services_summary.append(f"{service_title} (ID: {ref_id}{time_str})")
+                        desc = f"{service_title} ({ref_id}{time_str})"
+                        services_summary.append(desc)
+                        sub_services_list.append(desc)
                 elif isinstance(item, str):
                     services_summary.append(item)
+                    sub_services_list.append(item)
 
             if services_summary:
                 booking_time_display = ", ".join(services_summary)
+            elif is_custom and getattr(booking, 'service_names', None):
+                sub_services_list = list(booking.service_names)
+                booking_time_display = ", ".join(sub_services_list)
+
         elif hasattr(booking, 'purchase_type'):
+            email_category = 'purchase'
             if booking.purchase_type == 'session_pass':
                 pass_name = booking.session_pass.name if booking.session_pass else "Session Pass"
-                booking_type_display = f"Session Pass: {pass_name}"
+                booking_type_display = f"{pass_name}"
+                purchase_info = {
+                    'total_sessions': booking.total_sessions or 10,
+                    'remaining_sessions': booking.remaining_sessions if booking.remaining_sessions is not None else 10,
+                    'validity': "Unlimited",
+                }
             else:
                 plan_name = booking.subscription_plan.name if booking.subscription_plan else "Subscription Plan"
-                booking_type_display = f"Subscription: {plan_name}"
+                booking_type_display = f"{plan_name}"
+                validity_str = "Ongoing"
+                if booking.end_date:
+                    validity_str = f"Until {booking.end_date.strftime('%Y-%m-%d')}"
+                purchase_info = {
+                    'plan_type': getattr(booking.subscription_plan, 'plan_type', 'weekly'),
+                    'sessions_per_week': booking.sessions_per_week or 1,
+                    'validity': validity_str,
+                }
             booking_date_display = booking.created_at.strftime('%Y-%m-%d') if booking.created_at else ""
             booking_time_display = booking.created_at.strftime('%H:%M') if booking.created_at else ""
             time_slot_display = ""
@@ -170,18 +194,43 @@ def send_booking_confirmation_email(booking):
             booking_date_display = str(booking.date)
             booking_time_display = f"{booking.start_time} - {booking.end_time}"
             time_slot_display = "Saltroom"
+            if getattr(booking, 'payment_status', '') == 'paid_with_package':
+                booking_type_display = 'Saltroom (Included in Package)'
+            elif getattr(booking, 'used_pass', False):
+                booking_type_display = 'Saltroom Session (Paid with Pass)'
+            elif getattr(booking, 'used_subscription', False):
+                booking_type_display = 'Saltroom Session (Subscription)'
         else:
             booking_type_display = 'Lunchroom'
             booking_date_display = str(getattr(booking, 'booking_date', ''))
             booking_time_display = str(getattr(booking, 'booking_time', ''))
             time_slot_display = ""
 
-        guests_count_display = getattr(booking, 'guests', None) or getattr(booking, 'capacity', 1)
+        # Check if booking is paid with package
+        is_paid_with_package = getattr(booking, 'payment_status', '') == 'paid_with_package' or getattr(booking, 'status', '') == 'confirmed_with_package'
 
+        guests_count_display = getattr(booking, 'guests', None) or getattr(booking, 'capacity', 1)
         is_paid_booking = hasattr(booking, 'total_price') and float(getattr(booking, 'total_price', 0)) > 0
+
+        # Adjust subject line based on category
+        if email_category == 'purchase':
+            if getattr(booking, 'purchase_type', '') == 'session_pass':
+                subject = f"Pass Confirmed! Reference: {booking.purchase_id} • Haven Wellness"
+            else:
+                subject = f"Subscription Confirmed! Reference: {booking.purchase_id} • Haven Wellness"
+        elif email_category == 'package':
+            subject = f"Package Booking Confirmed! Reference: {booking.booking_id} • Haven Wellness"
+        elif is_paid_with_package:
+            subject = f"Package Reservation Confirmed! Reference: {booking.booking_id} • Haven Wellness"
+        else:
+            subject = f"Booking Confirmed! Reference: {booking.booking_id} • Haven Wellness"
 
         context = {
             'booking': booking,
+            'email_category': email_category,
+            'is_paid_with_package': is_paid_with_package,
+            'sub_services_list': sub_services_list,
+            'purchase_info': purchase_info,
             'booking_type_display': booking_type_display,
             'booking_date_display': booking_date_display,
             'booking_time_display': booking_time_display,
@@ -195,15 +244,24 @@ def send_booking_confirmation_email(booking):
         time_slot_str = f" ({time_slot_display})" if time_slot_display else ""
         total_paid_str = f"\nTotal Paid: €{booking.total_price}" if hasattr(booking, 'total_price') else ""
 
+        if email_category == 'purchase':
+            intro_plain = "Thank you for your purchase. Your pass/subscription has been activated and linked to your account."
+        elif email_category == 'package':
+            intro_plain = "Thank you for booking with us. Your package experience has been confirmed."
+        elif is_paid_with_package:
+            intro_plain = "Your reservation has been confirmed as part of your package experience."
+        else:
+            intro_plain = "Thank you for choosing Haven Wellness! Your booking has been confirmed."
+
         plain_message = (
             f"Hello {booking.name},\n\n"
-            f"Your booking has been confirmed!\n"
-            f"Booking ID: {booking.booking_id}\n"
+            f"{intro_plain}\n\n"
+            f"Reference ID: {booking.booking_id}\n"
             f"Type: {booking_type_display}\n"
             f"Date: {booking_date_display}\n"
             f"Time: {booking_time_display}{time_slot_str}"
             f"{total_paid_str}\n\n"
-            f"Thank you for choosing Haven Wellness!"
+            f"Haven Wellness\nsupport@havenwellness.com"
         )
 
         send_mail(
