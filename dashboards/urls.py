@@ -11,6 +11,7 @@ from .views import (
     AdminDatesOverviewView,
     AdminBlockDateView,
     AdminSpecialOpeningDateView,
+    AdminUsersView,
 )
 from services.views import AllServicesView
 from others.views import (
@@ -25,6 +26,9 @@ urlpatterns = [
     path('user/', UserDashboardView.as_view(), name='user-dashboard'),
     path('admin/bookings/', AdminBookingsView.as_view(), name='admin-bookings-list'),
     path('admin/bookings/<str:booking_id>/', AdminBookingsView.as_view(), name='admin-booking-detail'),
+    # Admin Users Management
+    path('admin/users/', AdminUsersView.as_view(), name='admin-users-list'),
+    path('admin/users/<int:user_id>/', AdminUsersView.as_view(), name='admin-users-detail'),
     path('admin/payments/', AdminPaymentsView.as_view(), name='admin-payments'),
     path('admin/access-codes/', AdminAccessCodesView.as_view(), name='admin-access-codes-list'),
     path('admin/access-codes/<str:access_code>/', AdminAccessCodesView.as_view(), name='admin-access-code-detail'),

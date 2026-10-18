@@ -315,3 +315,61 @@ class AdminDateActionResponseSerializer(serializers.Serializer):
     success = serializers.BooleanField(default=True)
     message = serializers.CharField()
     data = serializers.DictField(required=False)
+
+# ════════════════════════════════════════════════════════════════════════════════
+# ADMIN USERS SERIALIZERS
+# ════════════════════════════════════════════════════════════════════════════════
+
+class AdminUserItemSerializer(serializers.Serializer):
+    id = serializers.IntegerField(help_text="User ID")
+    uid = serializers.CharField(allow_null=True, required=False, help_text="User UID")
+    email = serializers.EmailField(help_text="User Email")
+    name = serializers.CharField(allow_null=True, required=False, help_text="User Full Name")
+    phone = serializers.CharField(allow_null=True, required=False, help_text="User Phone Number")
+    bio = serializers.CharField(allow_null=True, required=False, help_text="User Bio")
+    image = serializers.CharField(allow_null=True, required=False, help_text="Profile Image URL")
+    role = serializers.CharField(help_text="User Role: user, admin")
+    language = serializers.CharField(help_text="User Language: en, nl, de")
+    is_active = serializers.BooleanField(help_text="Active user status")
+    block = serializers.BooleanField(help_text="User suspension/block status")
+    date_joined = serializers.CharField(allow_null=True, required=False, help_text="Date Joined (YYYY-MM-DD HH:MM:SS)")
+    last_login = serializers.CharField(allow_null=True, required=False, help_text="Last Login (YYYY-MM-DD HH:MM:SS)")
+    total_bookings = serializers.IntegerField(help_text="Total bookings made by this user")
+    total_spent = serializers.CharField(help_text="Total amount spent by user across paid bookings")
+
+
+class AdminUsersMetricsSerializer(serializers.Serializer):
+    total_users = serializers.IntegerField(help_text="Total number of registered users")
+    active_users = serializers.IntegerField(help_text="Total active users")
+    blocked_users = serializers.IntegerField(help_text="Total blocked/suspended users")
+    admin_users = serializers.IntegerField(help_text="Total admin users")
+    regular_users = serializers.IntegerField(help_text="Total regular users")
+    joined_this_month = serializers.IntegerField(help_text="Users joined in current month")
+
+
+class AdminUsersPaginationResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    summary = AdminUsersMetricsSerializer(help_text="Global user metrics and counts")
+    total = serializers.IntegerField(help_text="Total matching users after filtering")
+    page = serializers.IntegerField(help_text="Current page number")
+    page_size = serializers.IntegerField(help_text="Page size")
+    total_pages = serializers.IntegerField(help_text="Total pages")
+    data = AdminUserItemSerializer(many=True, help_text="List of users for the current page")
+
+
+class AdminUserUpdateSerializer(serializers.Serializer):
+    name = serializers.CharField(required=False, allow_blank=True, allow_null=True, help_text="User full name")
+    phone = serializers.CharField(required=False, allow_blank=True, allow_null=True, help_text="User phone number")
+    bio = serializers.CharField(required=False, allow_blank=True, allow_null=True, help_text="User biography")
+    role = serializers.ChoiceField(choices=['user', 'admin'], required=False, help_text="User role: 'user' or 'admin'")
+    language = serializers.ChoiceField(choices=['en', 'nl', 'de'], required=False, help_text="Language: en, nl, de")
+    is_active = serializers.BooleanField(required=False, help_text="User active status (true/false)")
+    block = serializers.BooleanField(required=False, help_text="User suspended/blocked status (true/false)")
+    password = serializers.CharField(required=False, allow_blank=False, write_only=True, min_length=6, help_text="New password for user (optional)")
+    image = serializers.ImageField(required=False, allow_null=True, help_text="Profile image file upload")
+
+
+class AdminUserActionResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    message = serializers.CharField(help_text="Response message")
+    data = AdminUserItemSerializer(required=False, help_text="Updated user data")

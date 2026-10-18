@@ -1,3 +1,5 @@
+from decimal import Decimal
+from django.contrib.auth import get_user_model
 import math
 from datetime import datetime, date, time, timedelta
 from django.utils import timezone
@@ -39,7 +41,10 @@ from .serializers import (
     SpecialOpeningDateCreateUpdateSerializer,
     AdminDatesSummarySerializer,
     AdminDatesOverviewResponseSerializer,
-    AdminDateActionResponseSerializer
+    AdminDateActionResponseSerializer,
+    AdminUsersPaginationResponseSerializer,
+    AdminUserUpdateSerializer,
+    AdminUserActionResponseSerializer,
 )
 
 
@@ -3981,4 +3986,343 @@ class AdminAccessCodesView(APIView):
                 "special_request": b.special_request or "",
                 "total_price": str(b.total_price),
             }
+        }
+
+# ════════════════════════════════════════════════════════════════════════════════
+# ADMIN USERS VIEW (List with rich filters, pagination, summary & Update by ID)
+# ════════════════════════════════════════════════════════════════════════════════
+
+class AdminUsersView(APIView):
+    """
+    Admin Users Management API:
+    1. GET /api/dashboard/admin/users/
+       - List all users with comprehensive filtering (role, is_active, block, language,
+         date_joined range, search by name/email/phone/uid).
+       - Includes global summary counters (total_users, active_users, blocked_users, admin_users,
+         regular_users, joined_this_month).
+       - Supports sorting and pagination (page, page_size).
+       - Or query single user with `?id=<user_id>` or `admin/users/<user_id>/`.
+    2. PATCH / PUT /api/dashboard/admin/users/<user_id>/ (or `?id=<user_id>` or in body)
+       - Update user details: name, phone, bio, role, language, is_active, block (suspension),
+         password reset, and profile image upload.
+    3. DELETE /api/dashboard/admin/users/<user_id>/
+       - Delete or deactivate a user account.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Admin Users"],
+        summary="List all users with search, multi-filter, and pagination",
+        description=(
+            "Comprehensive user listing for admin dashboard with filtering by role (admin/user), "
+            "status (active/inactive), suspension (blocked/unblocked), language (en/nl/de), "
+            "registration date range, keyword search, and pagination."
+        ),
+        parameters=[
+            OpenApiParameter(name="search", description="Search keyword matching Name, Email, Phone, or UID", required=False, type=str),
+            OpenApiParameter(name="role", description="Filter by user role: 'admin', 'user', or 'all'", required=False, type=str),
+            OpenApiParameter(name="is_active", description="Filter by active status: 'true', 'false', '1', '0'", required=False, type=str),
+            OpenApiParameter(name="block", description="Filter by blocked/suspended status: 'true', 'false', '1', '0'", required=False, type=str),
+            OpenApiParameter(name="language", description="Filter by language code: 'en', 'nl', 'de'", required=False, type=str),
+            OpenApiParameter(name="date", description="Filter users joined on exact date (YYYY-MM-DD or 'today')", required=False, type=str),
+            OpenApiParameter(name="start_date", description="Filter users joined on or after date (YYYY-MM-DD)", required=False, type=str),
+            OpenApiParameter(name="end_date", description="Filter users joined on or before date (YYYY-MM-DD)", required=False, type=str),
+            OpenApiParameter(name="id", description="Direct lookup by User ID", required=False, type=int),
+            OpenApiParameter(name="ordering", description="Order by field: '-date_joined' (default), 'date_joined', 'name', '-name', 'email', '-email'", required=False, type=str),
+            OpenApiParameter(name="page", description="Page number (default: 1)", required=False, type=int),
+            OpenApiParameter(name="page_size", description="Number of results per page (default: 10, max: 100)", required=False, type=int),
+        ],
+        responses={200: AdminUsersPaginationResponseSerializer},
+    )
+    def get(self, request, user_id=None):
+        UserModel = get_user_model()
+        uid_param = user_id or request.query_params.get('id')
+
+        # 1. Single User Detail Lookup
+        if uid_param:
+            user_obj = UserModel.objects.filter(id=uid_param).first()
+            if not user_obj:
+                return Response({
+                    "success": False,
+                    "message": f"User with ID '{uid_param}' not found."
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            return Response({
+                "success": True,
+                "data": self._serialize_user(request, user_obj),
+            }, status=status.HTTP_200_OK)
+
+        # 2. Global Metrics / Summary
+        now = timezone.now()
+        first_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        total_users_count = UserModel.objects.count()
+        active_users_count = UserModel.objects.filter(is_active=True).count()
+        blocked_users_count = UserModel.objects.filter(block=True).count()
+        admin_users_count = UserModel.objects.filter(role='admin').count()
+        regular_users_count = UserModel.objects.filter(role='user').count()
+        joined_this_month_count = UserModel.objects.filter(date_joined__gte=first_of_month).count()
+
+        summary = {
+            "total_users": total_users_count,
+            "active_users": active_users_count,
+            "blocked_users": blocked_users_count,
+            "admin_users": admin_users_count,
+            "regular_users": regular_users_count,
+            "joined_this_month": joined_this_month_count,
+        }
+
+        # 3. Queryset & Filtering
+        qs = UserModel.objects.all()
+
+        # Search keyword
+        search = (request.query_params.get('search') or '').strip()
+        if search:
+            qs = qs.filter(
+                Q(name__icontains=search) |
+                Q(email__icontains=search) |
+                Q(phone__icontains=search) |
+                Q(uid__icontains=search)
+            )
+
+        # Role filter
+        role = (request.query_params.get('role') or '').strip().lower()
+        if role and role != 'all':
+            qs = qs.filter(role=role)
+
+        # is_active filter
+        is_active_val = request.query_params.get('is_active')
+        if is_active_val is not None and is_active_val != '':
+            val_str = str(is_active_val).lower().strip()
+            if val_str in ['true', '1']:
+                qs = qs.filter(is_active=True)
+            elif val_str in ['false', '0']:
+                qs = qs.filter(is_active=False)
+
+        # block / suspend filter
+        block_val = request.query_params.get('block')
+        if block_val is not None and block_val != '':
+            b_str = str(block_val).lower().strip()
+            if b_str in ['true', '1']:
+                qs = qs.filter(block=True)
+            elif b_str in ['false', '0']:
+                qs = qs.filter(block=False)
+
+        # language filter
+        lang = (request.query_params.get('language') or '').strip().lower()
+        if lang:
+            qs = qs.filter(language=lang)
+
+        # Date filter
+        exact_date = (request.query_params.get('date') or '').strip()
+        if exact_date:
+            if exact_date.lower() == 'today':
+                qs = qs.filter(date_joined__date=timezone.now().date())
+            else:
+                try:
+                    target_d = datetime.strptime(exact_date, "%Y-%m-%d").date()
+                    qs = qs.filter(date_joined__date=target_d)
+                except ValueError:
+                    pass
+
+        start_date = (request.query_params.get('start_date') or request.query_params.get('date_from') or '').strip()
+        if start_date:
+            try:
+                sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+                qs = qs.filter(date_joined__date__gte=sd)
+            except ValueError:
+                pass
+
+        end_date = (request.query_params.get('end_date') or request.query_params.get('date_to') or '').strip()
+        if end_date:
+            try:
+                ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+                qs = qs.filter(date_joined__date__lte=ed)
+            except ValueError:
+                pass
+
+        # 4. Ordering
+        ordering = (request.query_params.get('ordering') or '-date_joined').strip()
+        allowed_ordering = ['date_joined', '-date_joined', 'name', '-name', 'email', '-email', 'id', '-id']
+        if ordering in allowed_ordering:
+            qs = qs.order_by(ordering)
+        else:
+            qs = qs.order_by('-date_joined')
+
+        # 5. Pagination
+        total = qs.count()
+        page = int(request.query_params.get('page') or 1)
+        page_size = int(request.query_params.get('page_size') or 10)
+        page_size = max(1, min(page_size, 100))
+
+        total_pages = max(1, (total + page_size - 1) // page_size)
+        page = max(1, min(page, total_pages))
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+
+        page_users = qs[start_idx:end_idx]
+
+        data = [self._serialize_user(request, u) for u in page_users]
+
+        return Response({
+            "success": True,
+            "summary": summary,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "data": data,
+        }, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=["Admin Users"],
+        summary="Update a user's details, role, status, or password",
+        description="Update user profile fields, role, is_active, suspension/block, password, and avatar image.",
+        request=AdminUserUpdateSerializer,
+        responses={
+            200: AdminUserActionResponseSerializer,
+            400: AdminUserActionResponseSerializer,
+            404: AdminUserActionResponseSerializer,
+        }
+    )
+    def patch(self, request, user_id=None):
+        return self._handle_update(request, user_id)
+
+    @extend_schema(
+        tags=["Admin Users"],
+        summary="Update a user (PUT)",
+        request=AdminUserUpdateSerializer,
+        responses={200: AdminUserActionResponseSerializer}
+    )
+    def put(self, request, user_id=None):
+        return self._handle_update(request, user_id)
+
+    def _handle_update(self, request, user_id=None):
+        UserModel = get_user_model()
+        uid = user_id or request.data.get('id') or request.query_params.get('id')
+        if not uid:
+            return Response({
+                "success": False,
+                "message": "User ID is required for update."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        user_obj = UserModel.objects.filter(id=uid).first()
+        if not user_obj:
+            return Response({
+                "success": False,
+                "message": f"User with ID '{uid}' not found."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        data = request.data
+
+        # Update text & profile fields
+        if 'name' in data:
+            user_obj.name = data['name']
+        if 'phone' in data:
+            user_obj.phone = data['phone']
+        if 'bio' in data:
+            user_obj.bio = data['bio']
+        if 'language' in data:
+            lang = str(data['language']).lower().strip()
+            if lang in ['en', 'de', 'nl']:
+                user_obj.language = lang
+        if 'role' in data:
+            r = str(data['role']).lower().strip()
+            if r in ['admin', 'user']:
+                user_obj.role = r
+                if r == 'admin':
+                    user_obj.is_staff = True
+                else:
+                    user_obj.is_staff = False
+                    user_obj.is_superuser = False
+        if 'is_active' in data:
+            val = str(data['is_active']).lower().strip()
+            user_obj.is_active = val in ['true', '1']
+        if 'block' in data:
+            val = str(data['block']).lower().strip()
+            user_obj.block = val in ['true', '1']
+        if 'password' in data and data['password']:
+            user_obj.set_password(data['password'])
+
+        if 'image' in request.FILES:
+            user_obj.image = request.FILES['image']
+
+        user_obj.save()
+
+        return Response({
+            "success": True,
+            "message": f"User '{user_obj.email}' updated successfully.",
+            "data": self._serialize_user(request, user_obj),
+        }, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=["Admin Users"],
+        summary="Delete a user",
+        description="Permanently delete a user account from database.",
+        responses={200: AdminUserActionResponseSerializer, 404: AdminUserActionResponseSerializer}
+    )
+    def delete(self, request, user_id=None):
+        UserModel = get_user_model()
+        uid = user_id or request.data.get('id') or request.query_params.get('id')
+        if not uid:
+            return Response({
+                "success": False,
+                "message": "User ID is required."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        user_obj = UserModel.objects.filter(id=uid).first()
+        if not user_obj:
+            return Response({
+                "success": False,
+                "message": f"User with ID '{uid}' not found."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        u_email = user_obj.email
+        user_obj.delete()
+
+        return Response({
+            "success": True,
+            "message": f"User '{u_email}' has been successfully deleted."
+        }, status=status.HTTP_200_OK)
+
+    def _serialize_user(self, request, u):
+        # Calculate total bookings
+        b_count = 0
+        total_spent = Decimal("0.00")
+
+        # Reverse booking relations count
+        for rel in ['sauna_bookings', 'lunchroom_bookings', 'activity_bookings', 'event_bookings', 'package_bookings', 'saltroom_bookings']:
+            if hasattr(u, rel):
+                manager = getattr(u, rel)
+                b_count += manager.count()
+
+        # Calculate total spent from payments
+        if hasattr(u, 'payments'):
+            for p in u.payments.filter(payment_status__iexact='paid'):
+                if hasattr(p, 'amount') and p.amount:
+                    total_spent += Decimal(str(p.amount))
+
+        img_url = None
+        if u.image and hasattr(u.image, 'url'):
+            try:
+                img_url = request.build_absolute_uri(u.image.url)
+            except Exception:
+                img_url = u.image.url
+
+        return {
+            "id": u.id,
+            "uid": u.uid,
+            "email": u.email,
+            "name": u.name or "",
+            "phone": u.phone or "",
+            "bio": u.bio or "",
+            "image": img_url,
+            "role": u.role,
+            "language": u.language,
+            "is_active": u.is_active,
+            "block": u.block,
+            "date_joined": u.date_joined.strftime("%Y-%m-%d %H:%M:%S") if u.date_joined else None,
+            "last_login": u.last_login.strftime("%Y-%m-%d %H:%M:%S") if u.last_login else None,
+            "total_bookings": b_count,
+            "total_spent": str(total_spent),
         }
