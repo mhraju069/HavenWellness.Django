@@ -117,7 +117,8 @@ TEMPLATES = [
     },
 ]
 
-# ASGI_APPLICATION = 'core.asgi.application'
+ASGI_APPLICATION = 'core.asgi.application'
+WSGI_APPLICATION = "core.wsgi.application"
 
 # CHANNEL_LAYERS = {
 #     'default': {
