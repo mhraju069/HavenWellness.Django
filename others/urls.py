@@ -4,6 +4,7 @@ from .views import (
     PrivacyPolicyView,
     TermsAndConditionsView,
     SupportMessageView,
+    SocialMediaLinkView,
 )
 
 urlpatterns = [
@@ -23,4 +24,10 @@ urlpatterns = [
     path('support-messages/<int:pk>/', SupportMessageView.as_view(), name='support-messages-detail'),
     path('messages/', SupportMessageView.as_view(), name='messages-alias'),
     path('messages/<int:pk>/', SupportMessageView.as_view(), name='messages-detail-alias'),
+
+    # Social Media Links (GET: public, PATCH/PUT: admin update/create)
+    path('social-media/', SocialMediaLinkView.as_view(), name='social-media-links'),
+    path('social-links/', SocialMediaLinkView.as_view(), name='social-media-links-alias'),
 ]
+
+

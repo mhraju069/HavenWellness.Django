@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ContactInfo, TermsAndConditions, PrivacyPolicy, FAQ, SupportMessage
+from .models import ContactInfo, TermsAndConditions, PrivacyPolicy, FAQ, SupportMessage, SocialMediaLink
 
 
 class ContactInfoSerializer(serializers.ModelSerializer):
@@ -90,3 +90,16 @@ class SupportMessageCreateSerializer(serializers.Serializer):
     phone = serializers.CharField(required=False, allow_blank=True, max_length=50)
     subject = serializers.CharField(required=False, allow_blank=True, max_length=255)
     message = serializers.CharField(required=True, allow_blank=False)
+
+
+class SocialMediaLinkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SocialMediaLink
+        fields = ['id', 'media_type', 'url', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class SocialMediaBulkUpdateSerializer(serializers.Serializer):
+    facebook = serializers.URLField(required=False, allow_blank=True, allow_null=True)
+    instagram = serializers.URLField(required=False, allow_blank=True, allow_null=True)
+    twitter = serializers.URLField(required=False, allow_blank=True, allow_null=True)

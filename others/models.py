@@ -74,3 +74,18 @@ class ContactInfo(models.Model):
 
     def __str__(self):
         return f"Contact Info ({self.email})"
+
+
+class SocialMediaLink(models.Model):
+    MEDIA_CHOICES = (
+        ('facebook', 'Facebook'),
+        ('instagram', 'Instagram'),
+        ('twitter', 'Twitter')
+    )
+    media_type = models.CharField(max_length=255, choices=MEDIA_CHOICES, unique=True)
+    url = models.URLField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.media_type

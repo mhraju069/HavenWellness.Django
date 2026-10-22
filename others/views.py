@@ -7,7 +7,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
-from .models import ContactInfo, TermsAndConditions, PrivacyPolicy, FAQ, SupportMessage
+from .models import ContactInfo, TermsAndConditions, PrivacyPolicy, FAQ, SupportMessage, SocialMediaLink
 from .serializers import (
     ContactInfoSerializer,
     TermsAndConditionsSerializer,
@@ -15,6 +15,8 @@ from .serializers import (
     FAQSerializer,
     SupportMessageSerializer,
     SupportMessageCreateSerializer,
+    SocialMediaLinkSerializer,
+    SocialMediaBulkUpdateSerializer,
 )
 
 
@@ -500,3 +502,141 @@ class SupportMessageView(APIView):
             "success": True,
             "message": f"Support message #{del_id} deleted successfully."
         }, status=status.HTTP_200_OK)
+
+
+# ============================================================================
+# 5. Social Media Links API (Public GET, Admin UPDATE/PATCH)
+# ============================================================================
+
+class SocialMediaLinkView(APIView):
+    """
+    Social Media Links API:
+    - GET: Publicly accessible by anyone (AllowAny). Returns all active links.
+    - PATCH / PUT: Admin only. Updates links if they exist, or creates them if they don't exist.
+    """
+    def get_permissions(self):
+        if self.request.method in ['GET', 'HEAD', 'OPTIONS']:
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        if request.method not in ['GET', 'HEAD', 'OPTIONS']:
+            if not request.user.is_staff and not getattr(request.user, 'is_superuser', False):
+                self.permission_denied(
+                    request,
+                    message="Admin privileges are required to update social media links.",
+                    code=status.HTTP_403_FORBIDDEN
+                )
+
+    @extend_schema(
+        tags=["Social Media Links"],
+        summary="Get Social Media Links (Public)",
+        description="Publicly accessible. Returns all configured social media links and a key-value mapping.",
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def get(self, request):
+        links = SocialMediaLink.objects.all().order_by('id')
+        serializer = SocialMediaLinkSerializer(links, many=True)
+
+        links_dict = {
+            "facebook": None,
+            "instagram": None,
+            "twitter": None,
+        }
+        for item in links:
+            links_dict[item.media_type] = item.url
+
+        return Response({
+            "success": True,
+            "data": serializer.data,
+            "links": links_dict
+        }, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=["Social Media Links"],
+        summary="Update Social Media Links (Admin - Creates if not exists, updates if exists)",
+        description=(
+            "Admin-only update endpoint. Creates the record if it does not exist, or updates it if it exists.\n\n"
+            "Supports two formats:\n"
+            "1. Bulk object: `{'facebook': 'https://...', 'instagram': 'https://...', 'twitter': 'https://...'}`\n"
+            "2. Single object: `{'media_type': 'facebook', 'url': 'https://...'}`"
+        ),
+        request=OpenApiTypes.OBJECT,
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def patch(self, request):
+        data = request.data
+
+        # Format 1: Bulk format {"facebook": "...", "instagram": "...", "twitter": "..."}
+        if any(k in data for k in ['facebook', 'instagram', 'twitter']):
+            for m_type in ['facebook', 'instagram', 'twitter']:
+                if m_type in data:
+                    val = data.get(m_type)
+                    if val:
+                        SocialMediaLink.objects.update_or_create(
+                            media_type=m_type,
+                            defaults={'url': val}
+                        )
+                    elif val == "" or val is None:
+                        SocialMediaLink.objects.filter(media_type=m_type).delete()
+
+            all_links = SocialMediaLink.objects.all().order_by('id')
+            links_dict = {
+                "facebook": None,
+                "instagram": None,
+                "twitter": None,
+            }
+            for item in all_links:
+                links_dict[item.media_type] = item.url
+
+            return Response({
+                "success": True,
+                "message": "Social media links updated successfully.",
+                "data": SocialMediaLinkSerializer(all_links, many=True).data,
+                "links": links_dict
+            }, status=status.HTTP_200_OK)
+
+        # Format 2: Single item format {"media_type": "facebook", "url": "..."}
+        media_type = data.get('media_type')
+        url = data.get('url')
+
+        if not media_type or not url:
+            return Response({
+                "success": False,
+                "message": "Both 'media_type' and 'url' are required (or provide a bulk dictionary like {'facebook': '...', 'instagram': '...'})."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        valid_types = [c[0] for c in SocialMediaLink.MEDIA_CHOICES]
+        if media_type not in valid_types:
+            return Response({
+                "success": False,
+                "message": f"Invalid media_type '{media_type}'. Must be one of: {', '.join(valid_types)}"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        obj, created = SocialMediaLink.objects.update_or_create(
+            media_type=media_type,
+            defaults={'url': url}
+        )
+
+        all_links = SocialMediaLink.objects.all().order_by('id')
+        links_dict = {
+            "facebook": None,
+            "instagram": None,
+            "twitter": None,
+        }
+        for item in all_links:
+            links_dict[item.media_type] = item.url
+
+        msg = f"Social media link for {obj.get_media_type_display()} created successfully." if created else f"Social media link for {obj.get_media_type_display()} updated successfully."
+
+        return Response({
+            "success": True,
+            "message": msg,
+            "data": SocialMediaLinkSerializer(obj).data,
+            "links": links_dict
+        }, status=status.HTTP_200_OK)
+
+    def put(self, request):
+        return self.patch(request)
+

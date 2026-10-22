@@ -2036,6 +2036,142 @@ paths:
               schema:
                 $ref: '#/components/schemas/PrivacyPolicy'
           description: ''
+  /api/contact/social-links/:
+    get:
+      operationId: contact_social_links_retrieve
+      description: Publicly accessible. Returns all configured social media links
+        and a key-value mapping.
+      summary: Get Social Media Links (Public)
+      tags:
+      - Social Media Links
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    put:
+      operationId: contact_social_links_update
+      description: |-
+        Social Media Links API:
+        - GET: Publicly accessible by anyone (AllowAny). Returns all active links.
+        - PATCH / PUT: Admin only. Updates links if they exist, or creates them if they don't exist.
+      tags:
+      - contact
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: contact_social_links_partial_update
+      description: |-
+        Admin-only update endpoint. Creates the record if it does not exist, or updates it if it exists.
+
+        Supports two formats:
+        1. Bulk object: `{'facebook': 'https://...', 'instagram': 'https://...', 'twitter': 'https://...'}`
+        2. Single object: `{'media_type': 'facebook', 'url': 'https://...'}`
+      summary: Update Social Media Links (Admin - Creates if not exists, updates if
+        exists)
+      tags:
+      - Social Media Links
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/contact/social-media/:
+    get:
+      operationId: contact_social_media_retrieve
+      description: Publicly accessible. Returns all configured social media links
+        and a key-value mapping.
+      summary: Get Social Media Links (Public)
+      tags:
+      - Social Media Links
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    put:
+      operationId: contact_social_media_update
+      description: |-
+        Social Media Links API:
+        - GET: Publicly accessible by anyone (AllowAny). Returns all active links.
+        - PATCH / PUT: Admin only. Updates links if they exist, or creates them if they don't exist.
+      tags:
+      - contact
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: contact_social_media_partial_update
+      description: |-
+        Admin-only update endpoint. Creates the record if it does not exist, or updates it if it exists.
+
+        Supports two formats:
+        1. Bulk object: `{'facebook': 'https://...', 'instagram': 'https://...', 'twitter': 'https://...'}`
+        2. Single object: `{'media_type': 'facebook', 'url': 'https://...'}`
+      summary: Update Social Media Links (Admin - Creates if not exists, updates if
+        exists)
+      tags:
+      - Social Media Links
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /api/contact/support-messages/:
     get:
       operationId: contact_support_messages_list
@@ -11263,6 +11399,142 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PrivacyPolicy'
+          description: ''
+  /api/others/social-links/:
+    get:
+      operationId: others_social_links_retrieve
+      description: Publicly accessible. Returns all configured social media links
+        and a key-value mapping.
+      summary: Get Social Media Links (Public)
+      tags:
+      - Social Media Links
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    put:
+      operationId: others_social_links_update
+      description: |-
+        Social Media Links API:
+        - GET: Publicly accessible by anyone (AllowAny). Returns all active links.
+        - PATCH / PUT: Admin only. Updates links if they exist, or creates them if they don't exist.
+      tags:
+      - others
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: others_social_links_partial_update
+      description: |-
+        Admin-only update endpoint. Creates the record if it does not exist, or updates it if it exists.
+
+        Supports two formats:
+        1. Bulk object: `{'facebook': 'https://...', 'instagram': 'https://...', 'twitter': 'https://...'}`
+        2. Single object: `{'media_type': 'facebook', 'url': 'https://...'}`
+      summary: Update Social Media Links (Admin - Creates if not exists, updates if
+        exists)
+      tags:
+      - Social Media Links
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/others/social-media/:
+    get:
+      operationId: others_social_media_retrieve
+      description: Publicly accessible. Returns all configured social media links
+        and a key-value mapping.
+      summary: Get Social Media Links (Public)
+      tags:
+      - Social Media Links
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    put:
+      operationId: others_social_media_update
+      description: |-
+        Social Media Links API:
+        - GET: Publicly accessible by anyone (AllowAny). Returns all active links.
+        - PATCH / PUT: Admin only. Updates links if they exist, or creates them if they don't exist.
+      tags:
+      - others
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: others_social_media_partial_update
+      description: |-
+        Admin-only update endpoint. Creates the record if it does not exist, or updates it if it exists.
+
+        Supports two formats:
+        1. Bulk object: `{'facebook': 'https://...', 'instagram': 'https://...', 'twitter': 'https://...'}`
+        2. Single object: `{'media_type': 'facebook', 'url': 'https://...'}`
+      summary: Update Social Media Links (Admin - Creates if not exists, updates if
+        exists)
+      tags:
+      - Social Media Links
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
           description: ''
   /api/others/support-messages/:
     get:

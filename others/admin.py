@@ -1,6 +1,6 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
-from .models import ContactInfo, TermsAndConditions, PrivacyPolicy, FAQ, SupportMessage
+from .models import ContactInfo, TermsAndConditions, PrivacyPolicy, FAQ, SupportMessage, SocialMediaLink
 
 
 @admin.register(ContactInfo)
@@ -34,3 +34,10 @@ class SupportMessageAdmin(ModelAdmin):
     def get_sender(self, obj):
         return obj.name or (obj.sender.username if obj.sender else "Anonymous")
     get_sender.short_description = "Sender"
+
+
+@admin.register(SocialMediaLink)
+class SocialMediaLinkAdmin(ModelAdmin):
+    list_display = ('id', 'media_type', 'url', 'updated_at')
+    list_editable = ('url',)
+    search_fields = ('media_type', 'url')
