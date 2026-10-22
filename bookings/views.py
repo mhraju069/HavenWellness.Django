@@ -12,6 +12,8 @@ from .serializers import (
     EventBookingSerializer,
     PackageBookingSerializer,
     SaltRoomBookingSerializer,
+    CancelBookingRequestSerializer,
+    CancelBookingResponseSerializer,
 )
 from payments.views import create_payment_intent_for_booking
 from payments.helper import send_booking_confirmation_email
@@ -813,4 +815,236 @@ class UserBookingsAPIView(APIView):
             "activities": ActivityBookingSerializer(activity_bookings, many=True).data,
             "packages": PackageBookingSerializer(package_bookings, many=True).data,
             "events": EventBookingSerializer(event_bookings, many=True).data,
+        }, status=status.HTTP_200_OK)
+
+
+def get_booking_start_datetime(booking):
+    """
+    Computes a timezone-aware or naive datetime representing the scheduled start time of a booking.
+    Supports all 6 models: SaunaBooking, SaltRoomBooking, ActivityBooking,
+    LunchroomBooking, EventBooking, PackageBooking.
+    """
+    from datetime import datetime, time
+    from django.utils import timezone
+
+    b_date = None
+    b_time = None
+
+    if isinstance(booking, SaunaBooking):
+        b_date = getattr(booking, 'booking_date', None)
+        b_time = getattr(booking, 'booking_time', None)
+    elif isinstance(booking, SaltRoomBooking):
+        b_date = getattr(booking, 'date', None)
+        b_time = getattr(booking, 'start_time', None)
+    elif isinstance(booking, ActivityBooking):
+        act = getattr(booking, 'activity', None)
+        b_date = getattr(act, 'date', None) if act else None
+        b_time = getattr(act, 'open_time', None) if act else None
+        if not b_date and getattr(booking, 'created_at', None):
+            b_date = booking.created_at.date()
+    elif isinstance(booking, LunchroomBooking):
+        b_date = getattr(booking, 'booking_date', None)
+        b_time = getattr(booking, 'booking_time', None)
+    elif isinstance(booking, EventBooking):
+        b_date = getattr(booking, 'date', None)
+        b_time = getattr(booking, 'start_time', None)
+    elif isinstance(booking, PackageBooking):
+        b_date = getattr(booking, 'date', None)
+        b_time = None
+
+    if not b_date:
+        if hasattr(booking, 'created_at') and booking.created_at:
+            return booking.created_at
+        return timezone.now()
+
+    if not b_time:
+        b_time = time(0, 0)
+
+    naive_dt = datetime.combine(b_date, b_time)
+    if timezone.is_aware(timezone.now()):
+        try:
+            return timezone.make_aware(naive_dt, timezone.get_current_timezone())
+        except Exception:
+            return naive_dt
+    return naive_dt
+
+
+@extend_schema(
+    tags=['Bookings'],
+    summary="Cancel a booking (Enforces 24-hour notice & restores pass session credits)",
+    description=(
+        "Cancels any booking (Sauna, Saltroom, Activity, Lunchroom, Package, Event) "
+        "if requested more than 24 hours before the scheduled appointment start time. "
+        "If cancellation occurs within 24 hours of start time (or after start time), cancellation is rejected. "
+        "For bookings booked with a Session Pass / Membership, the deducted credit is automatically restored."
+    ),
+    request=CancelBookingRequestSerializer,
+    responses={
+        200: CancelBookingResponseSerializer,
+        400: OpenApiTypes.OBJECT,
+        404: OpenApiTypes.OBJECT,
+    }
+)
+class CancelBookingAPIView(APIView):
+    """
+    Cancellation endpoint for bookings.
+    Accepts booking_id via URL path (POST /api/bookings/<booking_id>/cancel/)
+    or request payload/query param `booking_id`.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request, booking_id=None):
+        from django.utils import timezone
+        from dashboards.views import find_booking_by_id, serialize_admin_booking_item
+        from payments.models import ClientPurchase
+
+        target_id = booking_id or request.data.get('booking_id') or request.query_params.get('booking_id')
+        if not target_id:
+            return Response({
+                "success": False,
+                "message": "booking_id is required either in the URL or request body."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        target_id = str(target_id).strip()
+        booking_obj, model_cls, svc_type = find_booking_by_id(target_id)
+        if not booking_obj:
+            return Response({
+                "success": False,
+                "message": f"Booking '{target_id}' not found."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # Optional security check: if user is authenticated and not staff, verify ownership
+        user = request.user
+        if user and user.is_authenticated and not user.is_staff:
+            booking_user = getattr(booking_obj, 'user', None)
+            booking_email = getattr(booking_obj, 'email', None)
+            user_matches = (booking_user == user) or (booking_email and booking_email.lower() == (user.email or '').lower())
+            if not user_matches and booking_user is not None:
+                return Response({
+                    "success": False,
+                    "message": "You do not have permission to cancel this booking."
+                }, status=status.HTTP_403_FORBIDDEN)
+
+        current_status = getattr(booking_obj, 'status', None)
+        if current_status == 'cancelled':
+            return Response({
+                "success": False,
+                "message": f"Booking '{target_id}' is already cancelled.",
+                "booking_id": booking_obj.booking_id,
+                "status": "cancelled",
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # 24-Hour Policy Check
+        start_dt = get_booking_start_datetime(booking_obj)
+        now_dt = timezone.now()
+
+        # Align timezone awareness
+        if timezone.is_aware(start_dt) and not timezone.is_aware(now_dt):
+            now_dt = timezone.make_aware(now_dt, timezone.get_current_timezone())
+        elif not timezone.is_aware(start_dt) and timezone.is_aware(now_dt):
+            now_dt = timezone.make_naive(now_dt, timezone.get_current_timezone())
+
+        time_difference = start_dt - now_dt
+        hours_until_start = time_difference.total_seconds() / 3600.0
+
+        if hours_until_start < 24.0:
+            if hours_until_start < 0:
+                detail_msg = f"This booking was scheduled for {start_dt.strftime('%Y-%m-%d %H:%M')}, which has already passed."
+            else:
+                detail_msg = (
+                    f"Only {hours_until_start:.1f} hours remaining until start time ({start_dt.strftime('%Y-%m-%d %H:%M')}). "
+                    "Cancellations must be made at least 24 hours prior to the scheduled start time."
+                )
+
+            return Response({
+                "success": False,
+                "cancellation_allowed": False,
+                "message": f"Cancellation not possible: 24-hour notice policy required. {detail_msg}",
+                "booking_id": booking_obj.booking_id,
+                "start_time": start_dt.strftime('%Y-%m-%d %H:%M'),
+                "hours_until_start": round(hours_until_start, 2),
+                "required_notice_hours": 24,
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Proceed with Cancellation
+        credit_restored = False
+        remaining_sessions = None
+        restore_info = ""
+
+        # Check if booking used a Session Pass / Membership
+        # 1. SaltRoomBooking with used_pass or client_purchase
+        cp = getattr(booking_obj, 'client_purchase', None)
+        if not cp and getattr(booking_obj, 'used_pass', False):
+            # Attempt to locate active/confirmed ClientPurchase for this user/email
+            b_user = getattr(booking_obj, 'user', None)
+            b_email = getattr(booking_obj, 'email', None)
+            cp_qs = ClientPurchase.objects.filter(purchase_type='session_pass')
+            if b_user:
+                cp = cp_qs.filter(user=b_user).order_by('-created_at').first()
+            if not cp and b_email:
+                cp = cp_qs.filter(email__iexact=b_email).order_by('-created_at').first()
+
+        if cp:
+            # Restore 1 session credit if applicable
+            plan_type = getattr(cp.subscription_plan, 'plan_type', None) if getattr(cp, 'subscription_plan', None) else None
+            # Do not increment if unlimited subscription
+            if plan_type != 'unlimited':
+                cp.remaining_sessions = cp.remaining_sessions + 1
+                cp.save(update_fields=['remaining_sessions'])
+                credit_restored = True
+                remaining_sessions = cp.remaining_sessions
+                restore_info = f" 1 session credit has been refunded to pass/plan ({cp.purchase_id}). Remaining credits: {cp.remaining_sessions}."
+
+        # Update booking status
+        fields_to_update = []
+        if hasattr(booking_obj, 'status'):
+            booking_obj.status = 'cancelled'
+            fields_to_update.append('status')
+
+        # Optional cancellation reason
+        reason = request.data.get('reason')
+        if reason and hasattr(booking_obj, 'special_request'):
+            booking_obj.special_request = f"{getattr(booking_obj, 'special_request', '') or ''}\n[Cancellation Reason: {reason}]".strip()
+            fields_to_update.append('special_request')
+        elif reason and hasattr(booking_obj, 'notes'):
+            booking_obj.notes = f"{getattr(booking_obj, 'notes', '') or ''}\n[Cancellation Reason: {reason}]".strip()
+            fields_to_update.append('notes')
+
+        if fields_to_update:
+            booking_obj.save(update_fields=fields_to_update)
+        else:
+            booking_obj.save()
+
+        # If booking is part of a PackageBooking, or if it is a PackageBooking with sub-services, also update sub-services if applicable
+        if isinstance(booking_obj, PackageBooking):
+            raw_ids = booking_obj.booked_services_ids or []
+            for item in raw_ids:
+                if isinstance(item, dict):
+                    for _, sub_id in item.items():
+                        sub_b, _, _ = find_booking_by_id(sub_id)
+                        if sub_b and hasattr(sub_b, 'status') and sub_b.status != 'cancelled':
+                            sub_b.status = 'cancelled'
+                            sub_b.save(update_fields=['status'])
+                elif isinstance(item, str):
+                    sub_b, _, _ = find_booking_by_id(item)
+                    if sub_b and hasattr(sub_b, 'status') and sub_b.status != 'cancelled':
+                        sub_b.status = 'cancelled'
+                        sub_b.save(update_fields=['status'])
+
+        # Prepare standardized representation
+        data_item = serialize_admin_booking_item(booking_obj, svc_type)
+        data_item.pop('_sort_created_at', None)
+        data_item.pop('_sort_datetime', None)
+
+        return Response({
+            "success": True,
+            "cancellation_allowed": True,
+            "message": f"Booking '{booking_obj.booking_id}' has been cancelled successfully.{restore_info}",
+            "booking_id": booking_obj.booking_id,
+            "status": "cancelled",
+            "payment_status": getattr(booking_obj, 'payment_status', None),
+            "credit_restored": credit_restored,
+            "remaining_sessions": remaining_sessions,
+            "hours_until_start": round(hours_until_start, 2),
+            "data": data_item
         }, status=status.HTTP_200_OK)

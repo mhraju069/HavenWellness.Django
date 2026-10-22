@@ -531,3 +531,30 @@ class SaltRoomBookingSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class CancelBookingRequestSerializer(serializers.Serializer):
+    booking_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Booking ID to cancel, e.g. PS-0001, SR-0002, ACT-0003, LR-0004, PKG-0005, EVNT-0006. (Optional if provided in URL path)"
+    )
+    reason = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Optional cancellation reason provided by client"
+    )
+
+
+class CancelBookingResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField(default=True)
+    message = serializers.CharField()
+    booking_id = serializers.CharField()
+    status = serializers.CharField()
+    payment_status = serializers.CharField(allow_null=True, required=False)
+    credit_restored = serializers.BooleanField(default=False)
+    remaining_sessions = serializers.IntegerField(allow_null=True, required=False)
+    hours_until_start = serializers.FloatField(allow_null=True, required=False)
+    data = serializers.DictField(required=False)
+
+
+
