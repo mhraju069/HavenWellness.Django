@@ -86,6 +86,7 @@ MODELTRANSLATION_FALLBACK_LANGUAGES = ('en', 'nl', 'de')
 AUTH_USER_MODEL = "accounts.User"
 
 MIDDLEWARE = [
+    'core.middleware.ForceHttpsMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

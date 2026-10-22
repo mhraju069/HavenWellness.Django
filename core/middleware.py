@@ -27,3 +27,35 @@ class LanguageMiddleware:
 
         response = self.get_response(request)
         return response
+
+
+class ForceHttpsMiddleware:
+    """
+    Middleware to force request scheme to HTTPS so that all serializer
+    file/image fields and build_absolute_uri calls always generate https:// URLs.
+    """
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # Force WSGI / ASGI environ scheme to https
+        request.environ['wsgi.url_scheme'] = 'https'
+        request.environ['HTTP_X_FORWARDED_PROTO'] = 'https'
+
+        # Force request.is_secure() to return True
+        request.is_secure = lambda: True
+
+        # Monkey-patch build_absolute_uri for this request to always enforce https
+        original_build_absolute_uri = request.build_absolute_uri
+
+        def forced_build_absolute_uri(location=None):
+            uri = original_build_absolute_uri(location)
+            if uri and uri.startswith('http://'):
+                uri = 'https://' + uri[7:]
+            return uri
+
+        request.build_absolute_uri = forced_build_absolute_uri
+
+        response = self.get_response(request)
+        return response
+
