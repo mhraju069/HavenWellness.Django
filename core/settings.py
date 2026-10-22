@@ -30,16 +30,13 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 ]
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760 * 400 # 400MB
 CSRF_TRUSTED_ORIGINS = [
-    'http://localhost',
-    'http://localhost:8000',
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://127.0.0.1',
-    'http://127.0.0.1:8000',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:5173',
-    'https://raju.loca.lt',
+    origin.strip() for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if origin.strip()
 ]
+
+# Ensure URLs/images generated behind reverse proxy use HTTPS
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
