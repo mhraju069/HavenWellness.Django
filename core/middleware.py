@@ -38,11 +38,15 @@ class ForceHttpsMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # Force WSGI / ASGI environ scheme to https
-        request.environ['wsgi.url_scheme'] = 'https'
-        request.environ['HTTP_X_FORWARDED_PROTO'] = 'https'
+        # Support both ASGI (Uvicorn/Daphne) and WSGI (Gunicorn)
+        if hasattr(request, 'scope'):
+            request.scope['scheme'] = 'https'
+        if hasattr(request, 'environ'):
+            request.environ['wsgi.url_scheme'] = 'https'
+            request.environ['HTTP_X_FORWARDED_PROTO'] = 'https'
 
-        # Force request.is_secure() to return True
+        # Force request.scheme and request.is_secure()
+        request.scheme = 'https'
         request.is_secure = lambda: True
 
         # Monkey-patch build_absolute_uri for this request to always enforce https
