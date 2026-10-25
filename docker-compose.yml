@@ -14,6 +14,8 @@ services:
       - DJANGO_SETTINGS_MODULE=core.settings
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+    restart:
+      - unless-stopped
 
   nginx:
     image: nginx:stable
@@ -27,11 +29,14 @@ services:
       # - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - web
+    restart:
+      - always
 
   redis:
     image: redis:7-alpine
     container_name: redis
-    restart: always
+    restart:
+      - always
     ports:
       - "6379:6379"
 
@@ -45,7 +50,8 @@ services:
     depends_on:
       - redis
       - web
-    restart: always
+    restart:
+      - always
 
   celery_beat:
     build: .
@@ -57,4 +63,5 @@ services:
     depends_on:
       - redis
       - web
-    restart: always
+    restart:
+      - always
