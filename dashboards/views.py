@@ -1000,61 +1000,98 @@ class AdminServiceDetailView(APIView):
                     return Response({"success": True, "message": f"Feature #{feat_id} deleted successfully."})
 
             if s_type == 'sauna':
-                ps = PrivateSauna.objects.first()
-                if not ps:
-                    ps = PrivateSauna.objects.create()
-                if 'base_price_3hrs' in data: ps.base_price_3hrs = data['base_price_3hrs']
-                if 'base_price_4hrs' in data: ps.base_price_4hrs = data['base_price_4hrs']
-                if 'max_person' in data: ps.max_person = data['max_person']
-                if 'extra_person_price' in data: ps.extra_person_price = data['extra_person_price']
-                if 'is_available' in data: ps.is_available = str(data['is_available']).lower() in ['true', '1']
-                ps.save()
+                sub_type = (
+                    data.get('sub_type') or 
+                    request.query_params.get('sub_type') or 
+                    ''
+                ).strip().lower()
 
-                # Private Sauna Features
-                priv_features = data.get('private_features') or data.get('private_sauna_features')
-                if priv_features is not None:
-                    if isinstance(priv_features, str):
-                        import json
-                        try: priv_features = json.loads(priv_features)
-                        except Exception: priv_features = []
-                    if isinstance(priv_features, list):
-                        PrivateSaunaFeatures.objects.filter(sauna=ps).delete()
-                        for f_item in priv_features:
-                            if isinstance(f_item, dict):
-                                f_text = f_item.get('feature_en') or f_item.get('feature') or ''
-                                if f_text:
-                                    feat_obj = PrivateSaunaFeatures(sauna=ps, feature=f_text, price=f_item.get('price') or 0)
-                                    for ml_f in ['feature_en', 'feature_nl', 'feature_de']:
-                                        if hasattr(feat_obj, ml_f):
-                                            setattr(feat_obj, ml_f, f_item.get(ml_f, f_text))
-                                    feat_obj.save()
+                if not sub_type:
+                    if raw_type in ['private_sauna', 'private-sauna'] or section in ['private_sauna', 'private']:
+                        sub_type = 'private'
+                    elif raw_type in ['shared_sauna', 'shared-sauna'] or section in ['shared_sauna', 'shared']:
+                        sub_type = 'shared'
 
-                ss = SharedSauna.objects.first()
-                if not ss:
-                    ss = SharedSauna.objects.create()
-                if 'price_per_person' in data: ss.price_per_person = data['price_per_person']
-                if 'max_person' in data: ss.max_person = data['max_person']
-                if 'is_available' in data: ss.is_available = str(data['is_available']).lower() in ['true', '1']
-                ss.save()
+                # 1. Update Private Sauna if targeted or in general save
+                if sub_type in ['private', 'private_sauna', ''] and sub_type != 'shared':
+                    has_private_fields = any(k in data for k in ['base_price_3hrs', 'base_price_4hrs', 'extra_person_price', 'max_person_private']) or (sub_type in ['private', 'private_sauna']) or ('max_person' in data and not any(k in data for k in ['price_per_person', 'max_person_shared', 'max_capacity']))
+                    
+                    if sub_type in ['private', 'private_sauna'] or has_private_fields or sub_type == '':
+                        ps = PrivateSauna.objects.first()
+                        if not ps:
+                            ps = PrivateSauna.objects.create()
+                        if 'base_price_3hrs' in data: ps.base_price_3hrs = data['base_price_3hrs']
+                        if 'base_price_4hrs' in data: ps.base_price_4hrs = data['base_price_4hrs']
+                        if 'max_person_private' in data:
+                            ps.max_person = data['max_person_private']
+                        elif 'max_person' in data and sub_type != 'shared':
+                            ps.max_person = data['max_person']
+                        if 'extra_person_price' in data: ps.extra_person_price = data['extra_person_price']
+                        if 'is_available_private' in data:
+                            ps.is_available = str(data['is_available_private']).lower() in ['true', '1']
+                        elif 'is_available' in data and sub_type != 'shared':
+                            ps.is_available = str(data['is_available']).lower() in ['true', '1']
+                        ps.save()
 
-                # Shared Sauna Features
-                shared_features = data.get('shared_features') or data.get('shared_sauna_features')
-                if shared_features is not None:
-                    if isinstance(shared_features, str):
-                        import json
-                        try: shared_features = json.loads(shared_features)
-                        except Exception: shared_features = []
-                    if isinstance(shared_features, list):
-                        SharedSaunaFeatures.objects.filter(sauna=ss).delete()
-                        for f_item in shared_features:
-                            if isinstance(f_item, dict):
-                                f_text = f_item.get('feature_en') or f_item.get('feature') or ''
-                                if f_text:
-                                    feat_obj = SharedSaunaFeatures(sauna=ss, feature=f_text, price=f_item.get('price') or 0)
-                                    for ml_f in ['feature_en', 'feature_nl', 'feature_de']:
-                                        if hasattr(feat_obj, ml_f):
-                                            setattr(feat_obj, ml_f, f_item.get(ml_f, f_text))
-                                    feat_obj.save()
+                        # Private Sauna Features
+                        priv_features = data.get('private_features') or data.get('private_sauna_features') or (data.get('features') if sub_type in ['private', 'private_sauna'] else None)
+                        if priv_features is not None:
+                            if isinstance(priv_features, str):
+                                import json
+                                try: priv_features = json.loads(priv_features)
+                                except Exception: priv_features = []
+                            if isinstance(priv_features, list):
+                                PrivateSaunaFeatures.objects.filter(sauna=ps).delete()
+                                for f_item in priv_features:
+                                    if isinstance(f_item, dict):
+                                        f_text = f_item.get('feature_en') or f_item.get('feature') or ''
+                                        if f_text:
+                                            feat_obj = PrivateSaunaFeatures(sauna=ps, feature=f_text, price=f_item.get('price') or 0)
+                                            for ml_f in ['feature_en', 'feature_nl', 'feature_de']:
+                                                if hasattr(feat_obj, ml_f):
+                                                    setattr(feat_obj, ml_f, f_item.get(ml_f, f_text))
+                                            feat_obj.save()
+
+                # 2. Update Shared Sauna if targeted or in general save
+                if sub_type in ['shared', 'shared_sauna', ''] and sub_type != 'private':
+                    has_shared_fields = any(k in data for k in ['price_per_person', 'max_person_shared', 'max_capacity', 'is_available_shared']) or (sub_type in ['shared', 'shared_sauna'])
+                    
+                    if sub_type in ['shared', 'shared_sauna'] or has_shared_fields or sub_type == '':
+                        ss = SharedSauna.objects.first()
+                        if not ss:
+                            ss = SharedSauna.objects.create()
+                        if 'price_per_person' in data: ss.price_per_person = data['price_per_person']
+                        
+                        shared_cap = data.get('max_person_shared') or data.get('max_capacity')
+                        if shared_cap is not None:
+                            ss.max_person = shared_cap
+                        elif 'max_person' in data and (sub_type in ['shared', 'shared_sauna'] or not any(k in data for k in ['base_price_3hrs', 'base_price_4hrs', 'extra_person_price', 'max_person_private'])):
+                            ss.max_person = data['max_person']
+
+                        if 'is_available_shared' in data:
+                            ss.is_available = str(data['is_available_shared']).lower() in ['true', '1']
+                        elif 'is_available' in data and (sub_type in ['shared', 'shared_sauna'] or not any(k in data for k in ['base_price_3hrs', 'base_price_4hrs', 'extra_person_price'])):
+                            ss.is_available = str(data['is_available']).lower() in ['true', '1']
+                        ss.save()
+
+                        # Shared Sauna Features
+                        shared_features = data.get('shared_features') or data.get('shared_sauna_features') or (data.get('features') if sub_type in ['shared', 'shared_sauna'] else None)
+                        if shared_features is not None:
+                            if isinstance(shared_features, str):
+                                import json
+                                try: shared_features = json.loads(shared_features)
+                                except Exception: shared_features = []
+                            if isinstance(shared_features, list):
+                                SharedSaunaFeatures.objects.filter(sauna=ss).delete()
+                                for f_item in shared_features:
+                                    if isinstance(f_item, dict):
+                                        f_text = f_item.get('feature_en') or f_item.get('feature') or ''
+                                        if f_text:
+                                            feat_obj = SharedSaunaFeatures(sauna=ss, feature=f_text, price=f_item.get('price') or 0)
+                                            for ml_f in ['feature_en', 'feature_nl', 'feature_de']:
+                                                if hasattr(feat_obj, ml_f):
+                                                    setattr(feat_obj, ml_f, f_item.get(ml_f, f_text))
+                                            feat_obj.save()
 
             elif s_type == 'saltroom':
                 sr = Saltroom.objects.first()
