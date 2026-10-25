@@ -272,6 +272,31 @@ def send_booking_confirmation_email(booking):
             html_message=html_message,
             fail_silently=False
         )
+
+        # Trigger real-time notification if user is associated
+        user = getattr(booking, 'user', None)
+        if user:
+            try:
+                from notifications.views import notify_user
+                b_id = getattr(booking, 'booking_id', getattr(booking, 'purchase_id', ''))
+                booking_url = f"/bookings/{b_id}" if b_id else "/bookings"
+                notify_user(
+                    user=user,
+                    title="Booking Confirmed!",
+                    body=f"Your booking ({booking_type_display}) with reference {b_id} has been confirmed.",
+                    notification_type='booking',
+                    link=booking_url,
+                    data={
+                        "booking_id": b_id,
+                        "type": booking_type_display,
+                        "date": booking_date_display,
+                        "time": booking_time_display,
+                        "link": booking_url,
+                    }
+                )
+            except Exception as notify_err:
+                print(f"Failed to dispatch real-time notification: {notify_err}")
+
         return {"status": True, "log": f"Confirmation email sent to {booking.email}"}
     except Exception as e:
         print(f"Failed to send booking confirmation email: {e}")

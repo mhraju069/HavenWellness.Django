@@ -8,12 +8,12 @@ services:
       - .:/app
     expose:
       - "8000"
-      # depends_on:
-      # - redis
-      # - db
+    depends_on:
+      - redis
     environment:
       - DJANGO_SETTINGS_MODULE=core.settings
-      # - REDIS_HOST=redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
 
   nginx:
     image: nginx:stable
@@ -27,52 +27,34 @@ services:
       # - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - web
-      # - db
 
-      # db:
-      #   image: postgres:15
-      #   container_name: db
-      #   restart: always
-      #   environment:
-      #     POSTGRES_DB: ${DB_NAME}
-      #     POSTGRES_USER: ${DB_USER}
-      #     POSTGRES_PASSWORD: ${DB_PASSWORD}
-      #   volumes:
-      #     - postgres_data:/var/lib/postgresql/data
-      #   ports:
-      #     - "5432:5432"
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
 
-      # redis:
-      #   image: redis:7
-      #   container_name: redis
-      #   ports:
-      #     - "6380:6379"
-      #     # - db
+  celery_worker:
+    build: .
+    container_name: celery_worker
+    command: celery -A core worker -l info --pool=solo
+    volumes:
+      - .:/app
+    working_dir: /app
+    depends_on:
+      - redis
+      - web
+    restart: always
 
-      # celery_worker:
-      #   build: .
-      #   container_name: celery_worker
-      #   command: celery -A core worker -l info --pool=solo
-      #   volumes:
-      #     - .:/app
-      #   working_dir: /app
-      #   depends_on:
-      #     - redis
-      #     - web
-      #   restart: always
-
-      # celery_beat:
-      #   build: .
-      #   container_name: celery_beat
-      #   command: celery -A core beat -l info
-      #   volumes:
-      #     - .:/app
-      #   working_dir: /app
-      #   depends_on:
-      #     - redis
-      #     - web
-      #   restart: always
-
-
-      # volumes:
-      #   postgres_data:
+  celery_beat:
+    build: .
+    container_name: celery_beat
+    command: celery -A core beat -l info
+    volumes:
+      - .:/app
+    working_dir: /app
+    depends_on:
+      - redis
+      - web
+    restart: always

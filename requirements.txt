@@ -24,6 +24,7 @@ gunicorn
 # Async support & WebSockets
 uvicorn
 channels
+channels-redis
 
 # Background Tasks
 celery
