@@ -17,6 +17,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             'title',
             'body',
             'notification_type',
+            'audience',
             'link',
             'data',
             'is_read',
@@ -25,6 +26,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'read_at']
+
 
 
 class DeviceRegisterResponseSerializer(serializers.Serializer):

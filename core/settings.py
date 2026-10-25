@@ -130,6 +130,27 @@ CHANNEL_LAYERS = {
     },
 }
 
+# Celery Configuration
+CELERY_BROKER_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+CELERY_RESULT_BACKEND = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'
+
+try:
+    from celery.schedules import crontab
+    CELERY_BEAT_SCHEDULE = {
+        'send-24h-booking-reminders': {
+            'task': 'notifications.tasks.send_24h_booking_reminders',
+            'schedule': crontab(minute=0),  # Runs every hour at minute 0
+        },
+    }
+except ImportError:
+    CELERY_BEAT_SCHEDULE = {}
+
+
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',

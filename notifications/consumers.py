@@ -23,6 +23,15 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
             self.channel_name
         )
 
+        # If user is admin/staff, join the broadcast admin notification group
+        is_admin_user = getattr(self.user, 'role', '') == 'admin' or getattr(self.user, 'is_staff', False) or getattr(self.user, 'is_superuser', False)
+        if is_admin_user:
+            self.admin_group_name = "admin_notifications"
+            await self.channel_layer.group_add(
+                self.admin_group_name,
+                self.channel_name
+            )
+
         await self.accept()
 
         # Send an initial connection acknowledgement
@@ -30,6 +39,7 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
             "type": "connection_established",
             "message": "Connected to real-time notifications.",
             "user_id": self.user.id,
+            "role": getattr(self.user, 'role', 'user'),
         })
 
     async def disconnect(self, close_code):
@@ -38,6 +48,12 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
                 self.user_group_name,
                 self.channel_name
             )
+        if hasattr(self, "admin_group_name"):
+            await self.channel_layer.group_discard(
+                self.admin_group_name,
+                self.channel_name
+            )
+
 
     async def receive_json(self, content):
         """

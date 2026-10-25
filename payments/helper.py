@@ -273,13 +273,17 @@ def send_booking_confirmation_email(booking):
             fail_silently=False
         )
 
-        # Trigger real-time notification if user is associated
+        # Trigger real-time notifications (User & Admin)
         user = getattr(booking, 'user', None)
+        b_id = getattr(booking, 'booking_id', getattr(booking, 'purchase_id', ''))
+        booking_url = f"/bookings/{b_id}" if b_id else "/bookings"
+        guest_name = getattr(booking, 'name', 'Guest')
+        total_price = getattr(booking, 'total_price', getattr(booking, 'price', None))
+
+        # 1. Notify User (if linked user)
         if user:
             try:
                 from notifications.views import notify_user
-                b_id = getattr(booking, 'booking_id', getattr(booking, 'purchase_id', ''))
-                booking_url = f"/bookings/{b_id}" if b_id else "/bookings"
                 notify_user(
                     user=user,
                     title="Booking Confirmed!",
@@ -295,7 +299,30 @@ def send_booking_confirmation_email(booking):
                     }
                 )
             except Exception as notify_err:
-                print(f"Failed to dispatch real-time notification: {notify_err}")
+                print(f"Failed to dispatch user real-time notification: {notify_err}")
+
+        # 2. Notify Admins about new confirmed booking / purchase
+        try:
+            from notifications.views import notify_admins
+            admin_link = f"/admin/bookings/{b_id}" if b_id else "/admin/dashboard"
+            price_text = f" (€{total_price})" if total_price is not None else ""
+            notify_admins(
+                title=f"New Booking: {booking_type_display}",
+                body=f"{guest_name} confirmed a booking ({b_id}){price_text} on {booking_date_display}.",
+                notification_type='booking',
+                link=admin_link,
+                data={
+                    "booking_id": b_id,
+                    "customer_name": guest_name,
+                    "type": booking_type_display,
+                    "date": booking_date_display,
+                    "time": booking_time_display,
+                    "total_price": str(total_price) if total_price else "0",
+                    "link": admin_link,
+                }
+            )
+        except Exception as admin_err:
+            print(f"Failed to dispatch admin real-time notification: {admin_err}")
 
         return {"status": True, "log": f"Confirmation email sent to {booking.email}"}
     except Exception as e:

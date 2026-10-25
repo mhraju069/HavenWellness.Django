@@ -51,12 +51,20 @@ class DeviceRegisterView(APIView):
         return Response({'message': 'Device registered successfully'}, status=status.HTTP_200_OK)
 
 
+from django.db.models import Q
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+
+
 @extend_schema(
     tags=['Notifications'],
-    summary="Get user notifications list",
+    summary="Get user or admin notifications list",
     parameters=[
         OpenApiParameter("is_read", OpenApiTypes.BOOL, OpenApiParameter.QUERY, description="Filter by read status (true/false)", required=False),
         OpenApiParameter("type", OpenApiTypes.STR, OpenApiParameter.QUERY, description="Filter by notification_type", required=False),
+        OpenApiParameter("scope", OpenApiTypes.STR, OpenApiParameter.QUERY, description="For admins: 'admin' (admin alerts only), 'user' (personal only), or default all visible", required=False),
     ],
     responses={200: NotificationListResponseSerializer}
 )
@@ -65,7 +73,22 @@ class NotificationView(APIView):
     serializer_class = NotificationSerializer
 
     def get(self, request):
-        queryset = Notification.objects.filter(user=request.user)
+        user = request.user
+        is_admin = getattr(user, 'role', '') == 'admin' or user.is_staff or user.is_superuser
+
+        scope = request.query_params.get('scope')
+
+        if is_admin:
+            if scope == 'admin':
+                queryset = Notification.objects.filter(Q(audience='admin') | Q(user=user, audience='user'))
+            elif scope == 'user':
+                queryset = Notification.objects.filter(user=user, audience='user')
+            else:
+                # By default, admins see both their direct notifications and admin-broadcast alerts
+                queryset = Notification.objects.filter(Q(user=user) | Q(audience='admin') | Q(audience='all'))
+        else:
+            # Regular users see their own notifications and any universal broadcast
+            queryset = Notification.objects.filter(Q(user=user, audience='user') | Q(audience='all'))
 
         is_read_param = request.query_params.get('is_read')
         if is_read_param is not None:
@@ -78,7 +101,7 @@ class NotificationView(APIView):
         if type_param:
             queryset = queryset.filter(notification_type=type_param)
 
-        unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
+        unread_count = queryset.filter(is_read=False).count()
         total_count = queryset.count()
 
         return Response({
@@ -91,13 +114,30 @@ class NotificationView(APIView):
 @extend_schema(
     tags=['Notifications'],
     summary="Get count of unread notifications",
+    parameters=[
+        OpenApiParameter("scope", OpenApiTypes.STR, OpenApiParameter.QUERY, description="For admins: 'admin', 'user', or all", required=False),
+    ],
     responses={200: UnreadCountResponseSerializer}
 )
 class NotificationUnreadCountView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
+        user = request.user
+        is_admin = getattr(user, 'role', '') == 'admin' or user.is_staff or user.is_superuser
+        scope = request.query_params.get('scope')
+
+        if is_admin:
+            if scope == 'admin':
+                queryset = Notification.objects.filter(Q(audience='admin') | Q(user=user, audience='user'))
+            elif scope == 'user':
+                queryset = Notification.objects.filter(user=user, audience='user')
+            else:
+                queryset = Notification.objects.filter(Q(user=user) | Q(audience='admin') | Q(audience='all'))
+        else:
+            queryset = Notification.objects.filter(Q(user=user, audience='user') | Q(audience='all'))
+
+        unread_count = queryset.filter(is_read=False).count()
         return Response({'unread_count': unread_count}, status=status.HTTP_200_OK)
 
 
@@ -110,8 +150,14 @@ class NotificationMarkReadView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self, request, pk):
+        user = request.user
+        is_admin = getattr(user, 'role', '') == 'admin' or user.is_staff or user.is_superuser
+
         try:
-            notification = Notification.objects.get(pk=pk, user=request.user)
+            if is_admin:
+                notification = Notification.objects.get(Q(pk=pk) & (Q(user=user) | Q(audience='admin') | Q(audience='all')))
+            else:
+                notification = Notification.objects.get(pk=pk, user=user)
         except Notification.DoesNotExist:
             return Response({'error': 'Notification not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -120,7 +166,11 @@ class NotificationMarkReadView(APIView):
             notification.read_at = timezone.now()
             notification.save(update_fields=['is_read', 'read_at'])
 
-        unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
+        if is_admin:
+            unread_count = Notification.objects.filter(Q(user=user) | Q(audience='admin') | Q(audience='all'), is_read=False).count()
+        else:
+            unread_count = Notification.objects.filter(user=user, is_read=False).count()
+
         return Response({
             'message': 'Notification marked as read',
             'unread_count': unread_count
@@ -136,10 +186,20 @@ class NotificationMarkAllReadView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        updated = Notification.objects.filter(user=request.user, is_read=False).update(
-            is_read=True,
-            read_at=timezone.now()
-        )
+        user = request.user
+        is_admin = getattr(user, 'role', '') == 'admin' or user.is_staff or user.is_superuser
+
+        if is_admin:
+            updated = Notification.objects.filter(
+                Q(user=user) | Q(audience='admin') | Q(audience='all'),
+                is_read=False
+            ).update(is_read=True, read_at=timezone.now())
+        else:
+            updated = Notification.objects.filter(
+                Q(user=user, audience='user') | Q(audience='all'),
+                is_read=False
+            ).update(is_read=True, read_at=timezone.now())
+
         return Response({
             'message': 'All notifications marked as read',
             'updated_count': updated,
@@ -148,7 +208,7 @@ class NotificationMarkAllReadView(APIView):
 
 
 def send_bulk_notification(tokens, title, body):
-    if not messaging:
+    if not messaging or not tokens:
         return
     message = messaging.MulticastMessage(
         notification=messaging.Notification(title=title, body=body),
@@ -162,9 +222,9 @@ def send_bulk_notification(tokens, title, body):
 
 
 def send_push_notification(token, title, body, data=None):
-    if not messaging:
+    if not messaging or not token:
         return False
-    # Ensure data values are strings for FCM payload
+    # Ensure all data values are strings for FCM payload
     fcm_data = {str(k): str(v) for k, v in (data or {}).items()}
     message = messaging.Message(
         notification=messaging.Notification(
@@ -177,25 +237,26 @@ def send_push_notification(token, title, body, data=None):
 
     try:
         response = messaging.send(message)
-        print(f"✅ Notification sent: {response}")
+        print(f"✅ FCM Notification sent: {response}")
         return True
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ FCM Error: {e}")
         return False
 
 
 def notify_user(user, title, body, notification_type='general', link=None, data=None):
     """
-    Central helper to:
-    1. Create Notification record in Database
-    2. Broadcast real-time message via Django Channels WebSocket (Redis channel layer)
-    3. Send mobile FCM push notification to user's registered devices
+    User-specific notification dispatch:
+    1. Creates Notification in DB
+    2. Sends real-time WebSocket to user's channel group
+    3. Sends FCM push notification to user's devices
     """
     if data is None:
         data = {}
 
     notification = Notification.objects.create(
         user=user,
+        audience='user',
         title=title,
         body=body,
         notification_type=notification_type,
@@ -222,7 +283,7 @@ def notify_user(user, title, body, notification_type='general', link=None, data=
                 }
             )
     except Exception as e:
-        print(f"⚠️ WebSocket dispatch failed: {e}")
+        print(f"⚠️ User WebSocket dispatch failed: {e}")
 
     # 2. Push Notification via FCM
     devices = Device.objects.filter(user=user)
@@ -238,6 +299,61 @@ def notify_user(user, title, body, notification_type='general', link=None, data=
             title=title,
             body=body,
             data=fcm_payload,
+        )
+
+    return notification
+
+
+def notify_admins(title, body, notification_type='general', link=None, data=None):
+    """
+    Admin-wide notification dispatch:
+    1. Creates an admin Notification record in DB (audience='admin')
+    2. Broadcasts real-time WebSocket to 'admin_notifications' channel group
+    3. Sends FCM push notification to all admin devices
+    """
+    if data is None:
+        data = {}
+
+    notification = Notification.objects.create(
+        user=None,
+        audience='admin',
+        title=title,
+        body=body,
+        notification_type=notification_type,
+        link=link,
+        data=data,
+    )
+
+    admin_unread_count = Notification.objects.filter(audience='admin', is_read=False).count()
+
+    # 1. Real-time WebSocket dispatch to admin group
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            serialized_data = NotificationSerializer(notification).data
+            async_to_sync(channel_layer.group_send)(
+                "admin_notifications",
+                {
+                    "type": "notification_message",
+                    "payload": {
+                        "notification": serialized_data,
+                        "unread_count": admin_unread_count,
+                    }
+                }
+            )
+    except Exception as e:
+        print(f"⚠️ Admin WebSocket dispatch failed: {e}")
+
+    # 2. Push Notification to all admin devices
+    admin_users = User.objects.filter(Q(role='admin') | Q(is_staff=True) | Q(is_superuser=True))
+    admin_devices = Device.objects.filter(user__in=admin_users)
+    tokens = list(admin_devices.values_list('token', flat=True))
+
+    if tokens:
+        send_bulk_notification(
+            tokens=tokens,
+            title=title,
+            body=body
         )
 
     return notification
