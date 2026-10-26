@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    ConfirmNativePaymentAPIView,
     CreatePaymentIntentAPIView,
     ConfirmPaymentAPIView,
     StripeWebhookView,
@@ -27,5 +28,7 @@ urlpatterns = [
     path('create-intent/', CreatePaymentIntentAPIView.as_view(), name='create_payment_intent'),
     path('webhook/', StripeWebhookView.as_view(), name='stripe_webhook'),
     path('success/', PaymentSuccessView.as_view(), name='payment_success'),
+    path('confirm-native/', ConfirmNativePaymentAPIView.as_view(), name='confirm_native_payment'),
     path('cancel/', PaymentCancelView.as_view(), name='payment_cancel'),
 ]
+

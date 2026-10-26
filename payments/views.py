@@ -1021,3 +1021,124 @@ def handle_djstripe_payment_failed(event, **kwargs):
         if booking_obj:
             booking_obj.payment_status = 'failed'
             booking_obj.save()
+class ConfirmNativePaymentAPIView(APIView):
+    """
+    Backend-proxied Stripe card payment confirmation for native mobile apps.
+
+    Mobile apps (iOS/Android) cannot directly call the Stripe API with a publishable key
+    to create PaymentMethods (blocked since mid-2024 for security reasons).
+
+    This endpoint receives raw card details from the mobile app, creates a PaymentMethod
+    using the Stripe SECRET KEY server-side (PCI-compliant), and confirms the PaymentIntent.
+
+    POST /api/payments/confirm-native/
+    Body:
+        client_secret  (str) : The PaymentIntent client_secret from the booking creation step
+        card_number    (str) : Raw card number (digits only)
+        exp_month      (int) : Expiry month (1-12)
+        exp_year       (int) : 4-digit expiry year
+        cvc            (str) : 3 or 4 digit CVC code
+        card_holder    (str) : Cardholder name (optional)
+        postal_code    (str) : Billing postal code (optional)
+        email          (str) : Billing email (optional)
+
+    Returns:
+        { success: true, payment_intent: { id, status, ... } }
+        { success: false, error: "message" }
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        import stripe as stripe_sdk
+
+        client_secret = request.data.get('client_secret', '').strip()
+        card_number = str(request.data.get('card_number', '')).replace(' ', '').replace('-', '')
+        exp_month = request.data.get('exp_month')
+        exp_year = request.data.get('exp_year')
+        cvc = str(request.data.get('cvc', '')).strip()
+        card_holder = request.data.get('card_holder', 'Guest')
+        postal_code = request.data.get('postal_code', '')
+        email = request.data.get('email', '')
+
+        # Input validation
+        if not client_secret or '_secret_' not in client_secret:
+            return Response({'success': False, 'error': 'Invalid or missing client_secret.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if not card_number or len(card_number) < 15:
+            return Response({'success': False, 'error': 'Invalid card number.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if not exp_month or not exp_year:
+            return Response({'success': False, 'error': 'Expiry month and year are required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if not cvc or len(cvc) < 3:
+            return Response({'success': False, 'error': 'Invalid CVC code.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        stripe_sdk.api_key = settings.STRIPE_SECRET_KEY
+
+        try:
+            # 1. Create PaymentMethod server-side using the Secret Key
+            billing_details = {'name': card_holder or 'Guest'}
+            if email:
+                billing_details['email'] = email
+            if postal_code:
+                billing_details['address'] = {'postal_code': postal_code}
+
+            payment_method = stripe_sdk.PaymentMethod.create(
+                type='card',
+                card={
+                    'number': card_number,
+                    'exp_month': int(exp_month),
+                    'exp_year': int(exp_year),
+                    'cvc': cvc,
+                },
+                billing_details=billing_details,
+            )
+        except stripe_sdk.error.CardError as e:
+            return Response({'success': False, 'error': e.user_message or str(e)},
+                            status=status.HTTP_402_PAYMENT_REQUIRED)
+        except stripe_sdk.error.StripeError as e:
+            return Response({'success': False, 'error': str(e.user_message or e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'success': False, 'error': f'Payment method creation failed: {str(e)}'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # 2. Extract PaymentIntent ID from client_secret
+            pi_id = client_secret.split('_secret_')[0]
+
+            # 3. Confirm the PaymentIntent with the created PaymentMethod
+            payment_intent = stripe_sdk.PaymentIntent.confirm(
+                pi_id,
+                payment_method=payment_method['id'],
+                client_secret=client_secret,
+            )
+
+            pi_status = payment_intent.get('status', '')
+
+            if pi_status in ('succeeded', 'processing'):
+                return Response({
+                    'success': True,
+                    'payment_intent': {
+                        'id': payment_intent['id'],
+                        'status': pi_status,
+                        'amount': payment_intent.get('amount'),
+                        'currency': payment_intent.get('currency'),
+                    }
+                }, status=status.HTTP_200_OK)
+            else:
+                last_error = payment_intent.get('last_payment_error', {})
+                err_msg = (last_error.get('message') if last_error else None) or f'Payment status: {pi_status}'
+                return Response({'success': False, 'error': err_msg},
+                                status=status.HTTP_402_PAYMENT_REQUIRED)
+
+        except stripe_sdk.error.CardError as e:
+            return Response({'success': False, 'error': e.user_message or str(e)},
+                            status=status.HTTP_402_PAYMENT_REQUIRED)
+        except stripe_sdk.error.StripeError as e:
+            return Response({'success': False, 'error': str(e.user_message or e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'success': False, 'error': f'Payment confirmation error: {str(e)}'},
+                            status=status.HTTP_400_BAD_REQUEST)
