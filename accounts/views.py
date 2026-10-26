@@ -265,7 +265,7 @@ class FirebaseSocialAuthView(APIView):
                 email=email,
                 uid=firebase_uid,
                 name=name,
-                role=role if role in ['user', 'admin'] else 'user',
+                role='user',
                 is_active=True
             )
             created = True
