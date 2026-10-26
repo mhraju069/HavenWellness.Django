@@ -64,3 +64,27 @@ class AuthResponseSerializer(serializers.Serializer):
     access = serializers.CharField(required=False, help_text="JWT Access Token")
     refresh = serializers.CharField(required=False, help_text="JWT Refresh Token")
     user = UserProfileSerializer(required=False)
+
+
+class FirebaseSocialAuthSerializer(serializers.Serializer):
+    id_token = serializers.CharField(
+        required=True,
+        help_text="Firebase ID Token obtained from Firebase Client SDK (Google, Apple, Facebook, Phone, etc.)"
+    )
+    role = serializers.ChoiceField(
+        choices=[('user', 'User'), ('admin', 'Admin')],
+        default='user',
+        required=False,
+        help_text="Role to assign if creating a new user (default: 'user')"
+    )
+
+
+class ForgotPasswordRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True, help_text="Registered email address to receive password reset OTP")
+
+
+class ResetPasswordRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True, help_text="User's email address")
+    otp_code = serializers.CharField(max_length=6, required=True, help_text="OTP code received in email")
+    new_password = serializers.CharField(write_only=True, required=True, min_length=6, help_text="New password (minimum 6 characters)")
+
