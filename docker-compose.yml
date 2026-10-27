@@ -44,6 +44,10 @@ services:
     volumes:
       - .:/app
     working_dir: /app
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     depends_on:
       - redis
       - web
@@ -56,6 +60,10 @@ services:
     volumes:
       - .:/app
     working_dir: /app
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     depends_on:
       - redis
       - web
