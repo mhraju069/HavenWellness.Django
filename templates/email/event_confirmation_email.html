@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="{{ lang|default:'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        {% if lang == 'nl' %}
+            Aanvraag Evenement Ontvangen - Heaven on Earth
+        {% elif lang == 'de' %}
+            Veranstaltungsanfrage erhalten - Heaven on Earth
+        {% else %}
+            Event Enquiry Received - Heaven on Earth
+        {% endif %}
+    </title>
+</head>
+<body style="margin: 0; padding: 32px 16px; background-color: #f7f5f2; color: #1e1e1e; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.65;">
+
+    <div style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e8e2dc; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+        
+        <!-- Header -->
+        <div style="background-color: #1a1815; padding: 28px 32px; text-align: center;">
+            <h1 style="margin: 0; color: #d4b483; font-size: 22px; font-weight: 600; letter-spacing: 0.5px;">HEAVEN ON EARTH</h1>
+            <p style="margin: 6px 0 0 0; color: #e5ded7; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px;">
+                {% if lang == 'nl' %}
+                    Evenement Aanvraag Bevestiging
+                {% elif lang == 'de' %}
+                    Bestätigung der Veranstaltungsanfrage
+                {% else %}
+                    Event Enquiry Confirmation
+                {% endif %}
+            </p>
+        </div>
+
+        <!-- Body Content -->
+        <div style="padding: 32px 32px 24px 32px;">
+
+            {% if lang == 'nl' %}
+                <p style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #111111;">Beste {{ name }},</p>
+                <p style="margin: 0 0 16px 0; color: #333333;">Wat leuk dat je Heaven on Earth overweegt voor jouw evenement! We hebben je aanvraag goed ontvangen.</p>
+                <p style="margin: 0 0 16px 0; color: #333333;">Onze eventplanningafdeling controleert eerst of de gewenste datum beschikbaar is. Is dat het geval, dan nemen we contact met je op om je wensen te bespreken en samen naar de mogelijkheden te kijken. We maken met plezier een offerte op maat.</p>
+                <p style="margin: 0 0 16px 0; color: #333333;">Je aanvraag is nog geen definitieve reservering. De datum is pas bevestigd zodra we alles hebben afgestemd en je akkoord bent met de offerte.</p>
+                <p style="margin: 0 0 24px 0; color: #333333;">We kijken ernaar uit om samen met je iets moois van jouw evenement te maken!</p>
+            {% elif lang == 'de' %}
+                <p style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #111111;">Hallo {{ name }},</p>
+                <p style="margin: 0 0 16px 0; color: #333333;">Wie schön, dass du Heaven on Earth für deine Veranstaltung in Betracht ziehst! Wir haben deine Anfrage erhalten.</p>
+                <p style="margin: 0 0 16px 0; color: #333333;">Unser Eventplanungsteam prüft zunächst, ob dein Wunschtermin noch verfügbar ist. Wenn das der Fall ist, melden wir uns bei dir, um deine Wünsche zu besprechen und gemeinsam die Möglichkeiten anzuschauen. Gerne erstellen wir ein individuelles Angebot für dich.</p>
+                <p style="margin: 0 0 24px 0; color: #333333;">Deine Anfrage ist noch keine verbindliche Reservierung. Der Termin ist erst bestätigt, wenn wir alles besprochen haben und du dem Angebot zugestimmt hast.</p>
+                <p style="margin: 0 0 24px 0; color: #333333;">Wir freuen uns darauf, gemeinsam etwas Schönes für deine Veranstaltung zu gestalten!</p>
+            {% else %}
+                <p style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #111111;">Hi {{ name }},</p>
+                <p style="margin: 0 0 16px 0; color: #333333;">How lovely that you’re considering Heaven on Earth for your event! We’ve received your enquiry.</p>
+                <p style="margin: 0 0 16px 0; color: #333333;">Our event planning team will first check whether your preferred date is available. If it is, we’ll get in touch to discuss your wishes and explore the possibilities together. We’ll be happy to put together a personalised quote for you.</p>
+                <p style="margin: 0 0 16px 0; color: #333333;">Your enquiry is not yet a confirmed reservation. The date will only be confirmed once we’ve discussed everything and you’ve agreed to the quote.</p>
+                <p style="margin: 0 0 24px 0; color: #333333;">We look forward to creating something special for your event together!</p>
+            {% endif %}
+
+            <!-- Summary Box -->
+            <div style="background-color: #faf8f5; border: 1px solid #ede7e0; border-radius: 12px; padding: 20px 24px; margin: 24px 0;">
+                <h3 style="margin: 0 0 14px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #7c6246;">
+                    {% if lang == 'nl' %}Details van je aanvraag{% elif lang == 'de' %}Details deiner Anfrage{% else %}Enquiry Details{% endif %}
+                </h3>
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                    <tr>
+                        <td style="padding: 6px 0; color: #666666; width: 40%;">
+                            {% if lang == 'nl' %}Referentienummer:{% elif lang == 'de' %}Referenz-ID:{% else %}Reference ID:{% endif %}
+                        </td>
+                        <td style="padding: 6px 0; font-weight: 600; color: #111111;">{{ booking.booking_id }}</td>
+                    </tr>
+                    {% if booking.date %}
+                    <tr>
+                        <td style="padding: 6px 0; color: #666666;">
+                            {% if lang == 'nl' %}Gewenste datum:{% elif lang == 'de' %}Wunschtermin:{% else %}Preferred Date:{% endif %}
+                        </td>
+                        <td style="padding: 6px 0; color: #111111;">{{ booking.date }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if booking.start_time and booking.end_time %}
+                    <tr>
+                        <td style="padding: 6px 0; color: #666666;">
+                            {% if lang == 'nl' %}Tijd:{% elif lang == 'de' %}Uhrzeit:{% else %}Time:{% endif %}
+                        </td>
+                        <td style="padding: 6px 0; color: #111111;">{{ booking.start_time }} – {{ booking.end_time }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if booking.guests %}
+                    <tr>
+                        <td style="padding: 6px 0; color: #666666;">
+                            {% if lang == 'nl' %}Aantal gasten:{% elif lang == 'de' %}Gästeanzahl:{% else %}Number of Guests:{% endif %}
+                        </td>
+                        <td style="padding: 6px 0; color: #111111;">{{ booking.guests }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+
+            <!-- Sign-off -->
+            <div style="margin-top: 28px; border-top: 1px solid #f0eae4; padding-top: 20px;">
+                {% if lang == 'nl' %}
+                    <p style="margin: 0; color: #444444;">Warme groet,</p>
+                    <p style="margin: 4px 0 0 0; font-weight: 700; color: #1a1815;">Team Heaven on Earth</p>
+                {% elif lang == 'de' %}
+                    <p style="margin: 0; color: #444444;">Herzliche Grüße,</p>
+                    <p style="margin: 4px 0 0 0; font-weight: 700; color: #1a1815;">Dein Team von Heaven on Earth</p>
+                {% else %}
+                    <p style="margin: 0; color: #444444;">Warm regards,</p>
+                    <p style="margin: 4px 0 0 0; font-weight: 700; color: #1a1815;">The Heaven on Earth Team</p>
+                {% endif %}
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div style="background-color: #faf8f5; border-top: 1px solid #ede7e0; padding: 18px 32px; text-align: center; font-size: 12px; color: #888888;">
+            <p style="margin: 0;">Heaven on Earth • Wellness, Cuisine &amp; Events</p>
+        </div>
+
+    </div>
+
+</body>
+</html>

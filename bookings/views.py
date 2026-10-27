@@ -148,7 +148,12 @@ class EventBookingAPIView(generics.ListCreateAPIView):
 
         # Send confirmation email
         try:
-            send_booking_confirmation_email(booking)
+            req_lang = (
+                request.query_params.get('lang') or
+                request.headers.get('Accept-Language') or
+                request.headers.get('lang')
+            )
+            send_booking_confirmation_email(booking, lang=req_lang)
         except Exception as mail_err:
             print("Event booking confirmation email error:", mail_err)
 

@@ -69,10 +69,48 @@ def create_payment_intent_data(request, booking, payment, price, customer_email,
     }
 
 
-def send_booking_confirmation_email(booking):
+def get_client_language(booking, lang=None):
+    """
+    Determine recipient client language ('en', 'nl', 'de').
+    Checks:
+    1. Explicit lang parameter (e.g. 'nl', 'de', 'en')
+    2. Booking's linked user language preference
+    3. Account language matching booking email
+    4. Active Django translation language
+    5. Fallback: 'en'
+    """
+    if lang:
+        l = str(lang).lower().strip()
+        if 'nl' in l: return 'nl'
+        if 'de' in l: return 'de'
+        if 'en' in l: return 'en'
+
+    user = getattr(booking, 'user', None)
+    if user and getattr(user, 'language', None):
+        u_lang = str(user.language).lower().strip()
+        if u_lang in ['nl', 'de', 'en']:
+            return u_lang
+
+    b_email = getattr(booking, 'email', None)
+    if b_email:
+        from accounts.models import User
+        matched_user = User.objects.filter(email__iexact=str(b_email).strip()).first()
+        if matched_user and getattr(matched_user, 'language', None):
+            u_lang = str(matched_user.language).lower().strip()
+            if u_lang in ['nl', 'de', 'en']:
+                return u_lang
+
+    from django.utils import translation
+    curr = str(translation.get_language() or '').lower()
+    if 'nl' in curr: return 'nl'
+    if 'de' in curr: return 'de'
+    return 'en'
+
+
+def send_booking_confirmation_email(booking, lang=None):
     """
     Sends a beautiful confirmation email with booking details (ID, date, time, total)
-    once a booking payment is confirmed.
+    once a booking payment is confirmed or an event enquiry is submitted.
     """
     if not booking or not booking.email:
         return {"status": False, "log": "Booking email not found."}
@@ -81,11 +119,13 @@ def send_booking_confirmation_email(booking):
     from django.template.loader import render_to_string
 
     try:
-        subject = f"Booking Confirmed! Reference: {booking.booking_id} • Haven Wellness"
+        client_lang = get_client_language(booking, lang=lang)
+        booking_id = getattr(booking, 'booking_id', getattr(booking, 'purchase_id', ''))
+        subject = f"Booking Confirmed! Reference: {booking_id} • Haven Wellness"
         email_from = getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None)
         recipient_list = [booking.email]
 
-        email_category = 'booking'  # 'booking', 'purchase', or 'package'
+        email_category = 'booking'  # 'booking', 'purchase', 'package', or 'event'
         sub_services_list = []
         purchase_info = {}
 
@@ -184,7 +224,8 @@ def send_booking_confirmation_email(booking):
             booking_date_display = booking.created_at.strftime('%Y-%m-%d') if booking.created_at else ""
             booking_time_display = booking.created_at.strftime('%H:%M') if booking.created_at else ""
             time_slot_display = ""
-        elif hasattr(booking, 'guests') and hasattr(booking, 'start_time'):
+        elif hasattr(booking, 'guests') and hasattr(booking, 'start_time') and not hasattr(booking, 'booked_services_ids') and getattr(booking, 'booking_id', '').startswith('EVNT-'):
+            email_category = 'event'
             booking_type_display = 'Event Booking'
             booking_date_display = str(booking.date)
             booking_time_display = f"{booking.start_time} - {booking.end_time}"
@@ -213,7 +254,14 @@ def send_booking_confirmation_email(booking):
         is_paid_booking = hasattr(booking, 'total_price') and float(getattr(booking, 'total_price', 0)) > 0
 
         # Adjust subject line based on category
-        if email_category == 'purchase':
+        if email_category == 'event':
+            if client_lang == 'nl':
+                subject = f"Aanvraag ontvangen! Referentie: {booking.booking_id} • Heaven on Earth"
+            elif client_lang == 'de':
+                subject = f"Anfrage erhalten! Referenz: {booking.booking_id} • Heaven on Earth"
+            else:
+                subject = f"Enquiry Received! Reference: {booking.booking_id} • Heaven on Earth"
+        elif email_category == 'purchase':
             if getattr(booking, 'purchase_type', '') == 'session_pass':
                 subject = f"Pass Confirmed! Reference: {booking.purchase_id} • Haven Wellness"
             else:
@@ -227,6 +275,8 @@ def send_booking_confirmation_email(booking):
 
         context = {
             'booking': booking,
+            'name': getattr(booking, 'name', 'Guest'),
+            'lang': client_lang,
             'email_category': email_category,
             'is_paid_with_package': is_paid_with_package,
             'sub_services_list': sub_services_list,
@@ -239,12 +289,58 @@ def send_booking_confirmation_email(booking):
             'is_paid_booking': is_paid_booking,
         }
 
-        html_message = render_to_string('email/booking_confirmation_email.html', context)
+        if email_category == 'event':
+            html_message = render_to_string('email/event_confirmation_email.html', context)
+        else:
+            html_message = render_to_string('email/booking_confirmation_email.html', context)
 
         time_slot_str = f" ({time_slot_display})" if time_slot_display else ""
         total_paid_str = f"\nTotal Paid: €{booking.total_price}" if hasattr(booking, 'total_price') else ""
 
-        if email_category == 'purchase':
+        if email_category == 'event':
+            if client_lang == 'nl':
+                plain_message = (
+                    f"Beste {booking.name},\n\n"
+                    f"Wat leuk dat je Heaven on Earth overweegt voor jouw evenement! We hebben je aanvraag goed ontvangen.\n\n"
+                    f"Onze eventplanningafdeling controleert eerst of de gewenste datum beschikbaar is. Is dat het geval, dan nemen we contact met je op om je wensen te bespreken en samen naar de mogelijkheden te kijken. We maken met plezier een offerte op maat.\n\n"
+                    f"Je aanvraag is nog geen definitieve reservering. De datum is pas bevestigd zodra we alles hebben afgestemd en je akkoord bent met de offerte.\n\n"
+                    f"We kijken ernaar uit om samen met je iets moois van jouw evenement te maken!\n\n"
+                    f"Referentienummer: {booking.booking_id}\n"
+                    f"Datum: {booking_date_display}\n"
+                    f"Tijd: {booking_time_display}\n"
+                    f"Aantal gasten: {guests_count_display}\n\n"
+                    f"Warme groet,\n\n"
+                    f"Team Heaven on Earth"
+                )
+            elif client_lang == 'de':
+                plain_message = (
+                    f"Hallo {booking.name},\n\n"
+                    f"Wie schön, dass du Heaven on Earth für deine Veranstaltung in Betracht ziehst! Wir haben deine Anfrage erhalten.\n\n"
+                    f"Unser Eventplanungsteam prüft zunächst, ob dein Wunschtermin noch verfügbar ist. Wenn das der Fall ist, melden wir uns bei dir, um deine Wünsche zu besprechen und gemeinsam die Möglichkeiten anzuschauen. Gerne erstellen wir ein individuelles Angebot für dich.\n\n"
+                    f"Deine Anfrage ist noch keine verbindliche Reservierung. Der Termin ist erst bestätigt, wenn wir alles besprochen haben und du dem Angebot zugestimmt hast.\n\n"
+                    f"Wir freuen uns darauf, gemeinsam etwas Schönes für deine Veranstaltung zu gestalten!\n\n"
+                    f"Referenz-ID: {booking.booking_id}\n"
+                    f"Datum: {booking_date_display}\n"
+                    f"Uhrzeit: {booking_time_display}\n"
+                    f"Gästeanzahl: {guests_count_display}\n\n"
+                    f"Herzliche Grüße,\n\n"
+                    f"Dein Team von Heaven on Earth"
+                )
+            else:
+                plain_message = (
+                    f"Hi {booking.name},\n\n"
+                    f"How lovely that you’re considering Heaven on Earth for your event! We’ve received your enquiry.\n\n"
+                    f"Our event planning team will first check whether your preferred date is available. If it is, we’ll get in touch to discuss your wishes and explore the possibilities together. We’ll be happy to put together a personalised quote for you.\n\n"
+                    f"Your enquiry is not yet a confirmed reservation. The date will only be confirmed once we’ve discussed everything and you’ve agreed to the quote.\n\n"
+                    f"We look forward to creating something special for your event together!\n\n"
+                    f"Reference ID: {booking.booking_id}\n"
+                    f"Date: {booking_date_display}\n"
+                    f"Time: {booking_time_display}\n"
+                    f"Number of Guests: {guests_count_display}\n\n"
+                    f"Warm regards,\n\n"
+                    f"The Heaven on Earth Team"
+                )
+        elif email_category == 'purchase':
             intro_plain = "Thank you for your purchase. Your pass/subscription has been activated and linked to your account."
         elif email_category == 'package':
             intro_plain = "Thank you for booking with us. Your package experience has been confirmed."
