@@ -9,13 +9,51 @@ class SubscriptionPlanFeaturesSerializer(serializers.ModelSerializer):
         exclude = ['subscription_plan', 'created_at', 'updated_at']
 
 
+def _sync_features(model_class, parent_instance, parent_fk_field, feature_list):
+    """
+    Helper to sync features with multi-language support:
+    feature_list can contain:
+    - simple strings: "Feature text"
+    - dictionaries: {"feature": "...", "feature_en": "...", "feature_nl": "...", "feature_de": "..."}
+    """
+    if feature_list is None:
+        return
+
+    # Delete existing
+    getattr(parent_instance, 'features').all().delete()
+
+    for item in feature_list:
+        if isinstance(item, str):
+            text = item.strip()
+            if text:
+                kwargs = {parent_fk_field: parent_instance, 'feature': text, 'feature_en': text}
+                model_class.objects.create(**kwargs)
+        elif isinstance(item, dict):
+            base_text = (
+                item.get('feature') or
+                item.get('feature_en') or
+                item.get('feature_nl') or
+                item.get('feature_de') or
+                ''
+            ).strip()
+            if base_text:
+                kwargs = {
+                    parent_fk_field: parent_instance,
+                    'feature': base_text,
+                    'feature_en': item.get('feature_en') or base_text,
+                    'feature_nl': item.get('feature_nl'),
+                    'feature_de': item.get('feature_de'),
+                }
+                model_class.objects.create(**kwargs)
+
+
 class SubscriptionPlansSerializer(serializers.ModelSerializer):
     features = SubscriptionPlanFeaturesSerializer(many=True, read_only=True)
     feature_list = serializers.ListField(
-        child=serializers.CharField(max_length=100),
+        child=serializers.JSONField(),
         write_only=True,
         required=False,
-        help_text="Optional list of feature strings to set for this plan, e.g. ['Unlimited sauna', 'Free locker']"
+        help_text="Optional list of feature strings or multilingual objects (e.g. [{'feature_en':'...', 'feature_nl':'...', 'feature_de':'...'}])"
     )
 
     class Meta:
@@ -25,10 +63,7 @@ class SubscriptionPlansSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         feature_list = validated_data.pop('feature_list', None)
         plan = SubscriptionPlans.objects.create(**validated_data)
-        if feature_list is not None:
-            for feat in feature_list:
-                if str(feat).strip():
-                    SubscriptionPlanFeatures.objects.create(subscription_plan=plan, feature=str(feat).strip())
+        _sync_features(SubscriptionPlanFeatures, plan, 'subscription_plan', feature_list)
         return plan
 
     def update(self, instance, validated_data):
@@ -36,11 +71,7 @@ class SubscriptionPlansSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-        if feature_list is not None:
-            instance.features.all().delete()
-            for feat in feature_list:
-                if str(feat).strip():
-                    SubscriptionPlanFeatures.objects.create(subscription_plan=instance, feature=str(feat).strip())
+        _sync_features(SubscriptionPlanFeatures, instance, 'subscription_plan', feature_list)
         return instance
 
 
@@ -53,10 +84,10 @@ class SessionPassFeaturesSerializer(serializers.ModelSerializer):
 class SessionPassSerializer(serializers.ModelSerializer):
     features = SessionPassFeaturesSerializer(many=True, read_only=True)
     feature_list = serializers.ListField(
-        child=serializers.CharField(max_length=100),
+        child=serializers.JSONField(),
         write_only=True,
         required=False,
-        help_text="Optional list of feature strings to set for this pass, e.g. ['10 sessions', 'Valid for 6 months']"
+        help_text="Optional list of feature strings or multilingual objects (e.g. [{'feature_en':'...', 'feature_nl':'...', 'feature_de':'...'}])"
     )
 
     class Meta:
@@ -66,10 +97,7 @@ class SessionPassSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         feature_list = validated_data.pop('feature_list', None)
         session_pass = SessionPass.objects.create(**validated_data)
-        if feature_list is not None:
-            for feat in feature_list:
-                if str(feat).strip():
-                    SessionPassFeatures.objects.create(session_pass=session_pass, feature=str(feat).strip())
+        _sync_features(SessionPassFeatures, session_pass, 'session_pass', feature_list)
         return session_pass
 
     def update(self, instance, validated_data):
@@ -77,11 +105,7 @@ class SessionPassSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-        if feature_list is not None:
-            instance.features.all().delete()
-            for feat in feature_list:
-                if str(feat).strip():
-                    SessionPassFeatures.objects.create(session_pass=instance, feature=str(feat).strip())
+        _sync_features(SessionPassFeatures, instance, 'session_pass', feature_list)
         return instance
 
 
