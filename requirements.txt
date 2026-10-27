@@ -121,7 +121,6 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 pytz==2025.2
 pyunormalize==16.0.0
-pywin32==310
 PyYAML==6.0.3
 referencing==0.37.0
 regex==2024.11.6
