@@ -116,9 +116,9 @@ def send_booking_confirmation_email(booking):
                 if isinstance(item, dict):
                     for service_type, ref_id in item.items():
                         if service_type in ['private', 'private_sauna']:
-                            service_title = 'Private Sauna'
+                            service_title = 'VIP Sauna'
                         elif service_type in ['shared', 'shared_sauna']:
-                            service_title = 'Shared Sauna'
+                            service_title = 'Sauna'
                         elif service_type in ['saltroom', 'salt_room']:
                             service_title = 'Salt Room'
                         elif service_type == 'lunchroom':

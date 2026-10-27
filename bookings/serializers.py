@@ -29,7 +29,7 @@ class PackageBookingSerializer(serializers.ModelSerializer):
         default=list,
         help_text=(
             "For CUSTOM packages only: list of selected service names, "
-            "e.g. ['Private Sauna', 'Lunchroom', 'Yoga Activity']. "
+            "e.g. ['VIP Sauna', 'Lunchroom', 'Yoga Activity']. "
             "These are stored as-is and no sub-bookings are created."
         )
     )

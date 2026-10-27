@@ -7,8 +7,8 @@ User = settings.AUTH_USER_MODEL
 
 class SaunaBooking(models.Model):
     SAUNA_TYPES = (
-        ('shared', 'Shared Sauna'),
-        ('private', 'Private Sauna'),
+        ('shared', 'Sauna'),
+        ('private', 'VIP Sauna'),
     )
 
     TIME_SLOTS = (
@@ -257,7 +257,7 @@ class PackageBooking(models.Model):
     notes = models.TextField(null=True, blank=True)
 
     booked_services_ids = models.JSONField(default=list, help_text="List of included service ids, e.g. [{'private_sauna':'PS-001'}, {'lunchroom':'LR-001'}]")
-    service_names = models.JSONField(default=list, blank=True, help_text="List of service names for custom packages, e.g. ['Private Sauna', 'Lunchroom', 'Yoga Activity']")
+    service_names = models.JSONField(default=list, blank=True, help_text="List of service names for custom packages, e.g. ['VIP Sauna', 'Sauna', 'Lunchroom', 'Yoga Activity']")
 
     name = models.CharField(max_length=100)
     email = models.EmailField()

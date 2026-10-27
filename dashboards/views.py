@@ -3415,13 +3415,13 @@ class AdminPaymentsView(APIView):
         services_breakdown_list = [
             {
                 "service_type": "private_sauna",
-                "service_name": "Private Sauna",
+                "service_name": "VIP Sauna",
                 "revenue": str(priv_sauna_rev),
                 "transactions_count": priv_sauna_count
             },
             {
                 "service_type": "shared_sauna",
-                "service_name": "Shared Sauna",
+                "service_name": "Sauna",
                 "revenue": str(shared_sauna_rev),
                 "transactions_count": shared_sauna_count
             },
