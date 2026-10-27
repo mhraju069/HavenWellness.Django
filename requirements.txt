@@ -22,7 +22,8 @@ whitenoise
 gunicorn
 
 # Async support & WebSockets
-uvicorn
+uvicorn[standard]
+websockets
 channels
 channels-redis
 

@@ -340,25 +340,26 @@ def send_booking_confirmation_email(booking, lang=None):
                     f"Warm regards,\n\n"
                     f"The Heaven on Earth Team"
                 )
-        elif email_category == 'purchase':
-            intro_plain = "Thank you for your purchase. Your pass/subscription has been activated and linked to your account."
-        elif email_category == 'package':
-            intro_plain = "Thank you for booking with us. Your package experience has been confirmed."
-        elif is_paid_with_package:
-            intro_plain = "Your reservation has been confirmed as part of your package experience."
         else:
-            intro_plain = "Thank you for choosing Haven Wellness! Your booking has been confirmed."
+            if email_category == 'purchase':
+                intro_plain = "Thank you for your purchase. Your pass/subscription has been activated and linked to your account."
+            elif email_category == 'package':
+                intro_plain = "Thank you for booking with us. Your package experience has been confirmed."
+            elif is_paid_with_package:
+                intro_plain = "Your reservation has been confirmed as part of your package experience."
+            else:
+                intro_plain = "Thank you for choosing Haven Wellness! Your booking has been confirmed."
 
-        plain_message = (
-            f"Hello {booking.name},\n\n"
-            f"{intro_plain}\n\n"
-            f"Reference ID: {booking.booking_id}\n"
-            f"Type: {booking_type_display}\n"
-            f"Date: {booking_date_display}\n"
-            f"Time: {booking_time_display}{time_slot_str}"
-            f"{total_paid_str}\n\n"
-            f"Haven Wellness\nsupport@havenwellness.com"
-        )
+            plain_message = (
+                f"Hello {booking.name},\n\n"
+                f"{intro_plain}\n\n"
+                f"Reference ID: {booking.booking_id}\n"
+                f"Type: {booking_type_display}\n"
+                f"Date: {booking_date_display}\n"
+                f"Time: {booking_time_display}{time_slot_str}"
+                f"{total_paid_str}\n\n"
+                f"Haven Wellness\nsupport@havenwellness.com"
+            )
 
         send_mail(
             subject=subject,
