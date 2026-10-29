@@ -77,7 +77,12 @@ class LunchroomBookingAPIView(generics.ListCreateAPIView):
 
         # Send confirmation email directly
         try:
-            send_booking_confirmation_email(booking)
+            req_lang = (
+                request.query_params.get('lang') or
+                request.headers.get('Accept-Language') or
+                request.headers.get('lang')
+            )
+            send_booking_confirmation_email(booking, lang=req_lang)
         except Exception as mail_err:
             print("Lunchroom confirmation email error:", mail_err)
 
@@ -187,8 +192,13 @@ class PackageBookingAPIView(generics.ListCreateAPIView):
         if is_custom:
             # Custom package: No sub-booking creation, no payment required.
             booking = serializer.save(status='pending', payment_status='pending')
+            req_lang = (
+                request.query_params.get('lang') or
+                request.headers.get('Accept-Language') or
+                request.headers.get('lang')
+            )
             try:
-                send_booking_confirmation_email(booking)
+                send_booking_confirmation_email(booking, lang=req_lang)
             except Exception as mail_err:
                 print("Custom package booking confirmation email error:", mail_err)
 

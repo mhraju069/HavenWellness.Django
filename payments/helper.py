@@ -241,6 +241,12 @@ def send_booking_confirmation_email(booking, lang=None):
                 booking_type_display = 'Saltroom Session (Paid with Pass)'
             elif getattr(booking, 'used_subscription', False):
                 booking_type_display = 'Saltroom Session (Subscription)'
+        elif hasattr(booking, 'booking_date') and hasattr(booking, 'booking_time') and getattr(booking, 'booking_id', '').startswith('LR-'):
+            email_category = 'lunchroom'
+            booking_type_display = 'Lunchroom'
+            booking_date_display = str(getattr(booking, 'booking_date', ''))
+            booking_time_display = str(getattr(booking, 'booking_time', ''))
+            time_slot_display = ""
         else:
             booking_type_display = 'Lunchroom'
             booking_date_display = str(getattr(booking, 'booking_date', ''))
@@ -253,8 +259,26 @@ def send_booking_confirmation_email(booking, lang=None):
         guests_count_display = getattr(booking, 'guests', None) or getattr(booking, 'capacity', 1)
         is_paid_booking = hasattr(booking, 'total_price') and float(getattr(booking, 'total_price', 0)) > 0
 
+        # Fetch dynamic contact details from DB
+        from others.models import ContactInfo
+        contact = ContactInfo.objects.first()
+        contact_address = contact.address if contact and contact.address else "Slotweg 1, Egmond aan den Hoef"
+        contact_phone = contact.phone if contact and contact.phone else "072-3030548"
+        contact_email = contact.email if contact and contact.email else (getattr(settings, "DEFAULT_FROM_EMAIL", None) or "info@heaven-on-earth.nl")
+
+        # First name for personalized greeting
+        full_name = getattr(booking, 'name', 'Guest') or 'Guest'
+        first_name = full_name.strip().split()[0] if full_name.strip() else 'Guest'
+
         # Adjust subject line based on category
-        if email_category == 'event':
+        if email_category == 'lunchroom':
+            if client_lang == 'en':
+                subject = f"How lovely that you're coming to enjoy some time with us! ✨ • Heaven on Earth"
+            elif client_lang == 'de':
+                subject = f"Wie schön, dass Sie bei uns eine genussvolle Zeit verbringen möchten! ✨ • Heaven on Earth"
+            else:
+                subject = f"Wat leuk dat je bij ons komt genieten! ✨ • Heaven on Earth"
+        elif email_category == 'event':
             if client_lang == 'nl':
                 subject = f"Aanvraag ontvangen! Referentie: {booking.booking_id} • Heaven on Earth"
             elif client_lang == 'de':
@@ -275,8 +299,12 @@ def send_booking_confirmation_email(booking, lang=None):
 
         context = {
             'booking': booking,
-            'name': getattr(booking, 'name', 'Guest'),
+            'name': full_name,
+            'first_name': first_name,
             'lang': client_lang,
+            'contact_address': contact_address,
+            'contact_phone': contact_phone,
+            'contact_email': contact_email,
             'email_category': email_category,
             'is_paid_with_package': is_paid_with_package,
             'sub_services_list': sub_services_list,
@@ -289,7 +317,9 @@ def send_booking_confirmation_email(booking, lang=None):
             'is_paid_booking': is_paid_booking,
         }
 
-        if email_category == 'event':
+        if email_category == 'lunchroom':
+            html_message = render_to_string('email/lunchroom_confirmation_email.html', context)
+        elif email_category == 'event':
             html_message = render_to_string('email/event_confirmation_email.html', context)
         else:
             html_message = render_to_string('email/booking_confirmation_email.html', context)
@@ -297,7 +327,53 @@ def send_booking_confirmation_email(booking, lang=None):
         time_slot_str = f" ({time_slot_display})" if time_slot_display else ""
         total_paid_str = f"\nTotal Paid: €{booking.total_price}" if hasattr(booking, 'total_price') else ""
 
-        if email_category == 'event':
+        if email_category == 'lunchroom':
+            if client_lang == 'en':
+                plain_message = (
+                    f"How lovely that you're coming to enjoy some time with us! ✨\n\n"
+                    f"Dear {first_name},\n\n"
+                    f"Thank you for your reservation at Heaven on Earth! We're delighted that you'll be visiting us soon.\n\n"
+                    f"We look forward to welcoming you to our cozy lunchroom, where you can relax, unwind, and enjoy all the delicious dishes we prepare with love.\n\n"
+                    f"Your reservation is confirmed, and we've saved a lovely spot just for you!\n\n"
+                    f"Do you have any questions or special requests? Please don't hesitate to contact us. We're always happy to help.\n\n"
+                    f"See you soon at Heaven on Earth!\n\n"
+                    f"Warm regards,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}\n"
+                    f"✉️ {contact_email}"
+                )
+            elif client_lang == 'de':
+                plain_message = (
+                    f"Wie schön, dass Sie bei uns eine genussvolle Zeit verbringen möchten! ✨\n\n"
+                    f"Liebe/r {first_name},\n\n"
+                    f"vielen Dank für Ihre Reservierung bei Heaven on Earth! Wir freuen uns sehr, dass Sie uns bald besuchen kommen.\n\n"
+                    f"Wir freuen uns darauf, Sie in unserem gemütlichen Lunchroom willkommen zu heißen. Hier können Sie sich entspannen, den Alltag hinter sich lassen und all die Köstlichkeiten genießen, die wir mit viel Liebe für Sie zubereiten.\n\n"
+                    f"Ihre Reservierung ist bestätigt und wir haben einen schönen Platz für Sie reserviert!\n\n"
+                    f"Haben Sie noch Fragen oder besondere Wünsche? Kontaktieren Sie uns gerne. Wir helfen Ihnen jederzeit mit Freude weiter.\n\n"
+                    f"Bis bald bei Heaven on Earth!\n\n"
+                    f"Mit herzlichen Grüßen,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}\n"
+                    f"✉️ {contact_email}"
+                )
+            else:
+                plain_message = (
+                    f"Wat leuk dat je bij ons komt genieten! ✨\n\n"
+                    f"Beste {first_name},\n\n"
+                    f"Bedankt voor je reservering bij Heaven on Earth! Wat gezellig dat je binnenkort bij ons langskomt.\n\n"
+                    f"We kijken ernaar uit je te verwelkomen in onze sfeervolle lunchroom, waar je heerlijk kunt ontspannen en genieten van al het lekkers dat we met liefde voor je bereiden.\n\n"
+                    f"Je reservering is bevestigd en we hebben een plekje voor je gereserveerd!\n\n"
+                    f"Heb je nog vragen of speciale wensen? Neem gerust contact met ons op. We denken graag met je mee.\n\n"
+                    f"Tot snel bij Heaven on Earth!\n\n"
+                    f"Met warme groet,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}\n"
+                    f"✉️ {contact_email}"
+                )
+        elif email_category == 'event':
             if client_lang == 'nl':
                 plain_message = (
                     f"Beste {booking.name},\n\n"
@@ -358,7 +434,7 @@ def send_booking_confirmation_email(booking, lang=None):
                 f"Date: {booking_date_display}\n"
                 f"Time: {booking_time_display}{time_slot_str}"
                 f"{total_paid_str}\n\n"
-                f"Haven Wellness\nsupport@havenwellness.com"
+                f"Heaven on Earth\n📍 {contact_address}\n📞 {contact_phone}\n✉️ {contact_email}"
             )
 
         send_mail(

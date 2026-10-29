@@ -26,10 +26,19 @@ def send_otp(email):
         recipient_list = [email]
         
         user_name = getattr(user, 'name', '') or getattr(user, 'username', '') or email.split('@')[0]
+        from others.models import ContactInfo
+        contact = ContactInfo.objects.first()
+        contact_address = contact.address if contact and contact.address else 'Slotweg 1, Egmond aan den Hoef'
+        contact_phone = contact.phone if contact and contact.phone else '072-3030548'
+        contact_email = contact.email if contact and contact.email else (getattr(settings, 'DEFAULT_FROM_EMAIL', None) or 'info@heaven-on-earth.nl')
+
         html_message = render_to_string('email/otp_email.html', {
             'otp': otp_obj.otp,
             'name': user_name,
             'user': user,
+            'contact_address': contact_address,
+            'contact_phone': contact_phone,
+            'contact_email': contact_email,
         })
         plain_message = f"Your OTP for email verification is: {otp_obj.otp}"
         send_mail(subject, plain_message, email_from, recipient_list, html_message=html_message)

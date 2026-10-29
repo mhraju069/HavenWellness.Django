@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="{{ lang|default:'nl' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        {% if lang == 'en' %}
+            How lovely that you're coming to enjoy some time with us! ✨ - Heaven on Earth
+        {% elif lang == 'de' %}
+            Wie schön, dass Sie bei uns eine genussvolle Zeit verbringen möchten! ✨ - Heaven on Earth
+        {% else %}
+            Wat leuk dat je bij ons komt genieten! ✨ - Heaven on Earth
+        {% endif %}
+    </title>
+</head>
+<body style="margin: 0; padding: 24px 16px; background-color: #ffffff; color: #111111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.6;">
+
+    <div style="max-width: 560px; margin: 0 auto; background-color: #ffffff;">
+        
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 20px 0; color: #000000; border-bottom: 2px solid #000000; padding-bottom: 12px; letter-spacing: -0.2px;">
+            {% if lang == 'en' %}
+                How lovely that you're coming to enjoy some time with us! ✨
+            {% elif lang == 'de' %}
+                Wie schön, dass Sie bei uns eine genussvolle Zeit verbringen möchten! ✨
+            {% else %}
+                Wat leuk dat je bij ons komt genieten! ✨
+            {% endif %}
+        </h2>
+
+        {% if lang == 'en' %}
+            <p style="margin: 0 0 16px 0;">Dear {{ first_name }},</p>
+            <p style="margin: 0 0 16px 0;">Thank you for your reservation at Heaven on Earth! We're delighted that you'll be visiting us soon.</p>
+            <p style="margin: 0 0 16px 0;">We look forward to welcoming you to our cozy lunchroom, where you can relax, unwind, and enjoy all the delicious dishes we prepare with love.</p>
+            <p style="margin: 0 0 16px 0; font-weight: 600;">Your reservation is confirmed, and we've saved a lovely spot just for you!</p>
+            <p style="margin: 0 0 20px 0;">Do you have any questions or special requests? Please don't hesitate to contact us. We're always happy to help.</p>
+            <p style="margin: 0 0 24px 0;">See you soon at Heaven on Earth!</p>
+        {% elif lang == 'de' %}
+            <p style="margin: 0 0 16px 0;">Liebe/r {{ first_name }},</p>
+            <p style="margin: 0 0 16px 0;">vielen Dank für Ihre Reservierung bei Heaven on Earth! Wir freuen uns sehr, dass Sie uns bald besuchen kommen.</p>
+            <p style="margin: 0 0 16px 0;">Wir freuen uns darauf, Sie in unserem gemütlichen Lunchroom willkommen zu heißen. Hier können Sie sich entspannen, den Alltag hinter sich lassen und all die Köstlichkeiten genießen, die wir mit viel Liebe für Sie zubereiten.</p>
+            <p style="margin: 0 0 16px 0; font-weight: 600;">Ihre Reservierung ist bestätigt und wir haben einen schönen Platz für Sie reserviert!</p>
+            <p style="margin: 0 0 20px 0;">Haben Sie noch Fragen oder besondere Wünsche? Kontaktieren Sie uns gerne. Wir helfen Ihnen jederzeit mit Freude weiter.</p>
+            <p style="margin: 0 0 24px 0;">Bis bald bei Heaven on Earth!</p>
+        {% else %}
+            <p style="margin: 0 0 16px 0;">Beste {{ first_name }},</p>
+            <p style="margin: 0 0 16px 0;">Bedankt voor je reservering bij Heaven on Earth! Wat gezellig dat je binnenkort bij ons langskomt.</p>
+            <p style="margin: 0 0 16px 0;">We kijken ernaar uit je te verwelkomen in onze sfeervolle lunchroom, waar je heerlijk kunt ontspannen en genieten van al het lekkers dat we met liefde voor je bereiden.</p>
+            <p style="margin: 0 0 16px 0; font-weight: 600;">Je reservering is bevestigd en we hebben een plekje voor je gereserveerd!</p>
+            <p style="margin: 0 0 20px 0;">Heb je nog vragen of speciale wensen? Neem gerust contact met ons op. We denken graag met je mee.</p>
+            <p style="margin: 0 0 24px 0;">Tot snel bij Heaven on Earth!</p>
+        {% endif %}
+
+        <!-- Reservation Summary Table -->
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0 24px 0; border-top: 1px solid #000000; border-bottom: 1px solid #000000;">
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #444444; width: 40%;">
+                    {% if lang == 'en' %}Reservation ID:{% elif lang == 'de' %}Reservierungs-ID:{% else %}Reserveringsnummer:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; font-weight: 700; color: #000000;">{{ booking.booking_id }}</td>
+            </tr>
+            {% if booking.booking_date %}
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #444444;">
+                    {% if lang == 'en' %}Date:{% elif lang == 'de' %}Datum:{% else %}Datum:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">{{ booking.booking_date }}</td>
+            </tr>
+            {% endif %}
+            {% if booking.booking_time %}
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #444444;">
+                    {% if lang == 'en' %}Time:{% elif lang == 'de' %}Uhrzeit:{% else %}Tijd:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">{{ booking.booking_time }}</td>
+            </tr>
+            {% endif %}
+            {% if booking.capacity %}
+            <tr>
+                <td style="padding: 8px 0; color: #444444;">
+                    {% if lang == 'en' %}Guests:{% elif lang == 'de' %}Gäste:{% else %}Aantal personen:{% endif %}
+                </td>
+                <td style="padding: 8px 0; color: #000000;">{{ booking.capacity }}</td>
+            </tr>
+            {% endif %}
+        </table>
+
+        <!-- Sign-off & Dynamic Contact Info -->
+        <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e5e5;">
+            <p style="margin: 0 0 4px 0;">
+                {% if lang == 'en' %}
+                    Warm regards,
+                {% elif lang == 'de' %}
+                    Mit herzlichen Grüßen,
+                {% else %}
+                    Met warme groet,
+                {% endif %}
+            </p>
+            <p style="margin: 0 0 16px 0; font-weight: 700; color: #000000;">Team Heaven on Earth</p>
+            
+            <p style="margin: 0 0 4px 0; color: #222222; font-size: 14px;">
+                📍 {{ contact_address|default:"Slotweg 1, Egmond aan den Hoef" }}
+            </p>
+            <p style="margin: 0 0 4px 0; color: #222222; font-size: 14px;">
+                📞 {{ contact_phone|default:"072-3030548" }}
+            </p>
+            {% if contact_email %}
+            <p style="margin: 0; color: #222222; font-size: 14px;">
+                ✉️ {{ contact_email }}
+            </p>
+            {% endif %}
+        </div>
+
+    </div>
+
+</body>
+</html>

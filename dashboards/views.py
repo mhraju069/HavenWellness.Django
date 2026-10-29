@@ -215,8 +215,19 @@ def serialize_event_booking(b):
     }
 
 
-def serialize_client_purchase(p):
-    plan_name = p.session_pass.name if p.session_pass else (p.subscription_plan.name if p.subscription_plan else p.name)
+def serialize_client_purchase(p, lang='en'):
+    target_obj = p.session_pass if p.session_pass else p.subscription_plan
+    plan_name = p.name
+    if target_obj:
+        lang_str = str(lang or 'en').lower()
+        if 'nl' in lang_str:
+            plan_name = getattr(target_obj, 'name_nl', None) or getattr(target_obj, 'name', p.name)
+        elif 'de' in lang_str:
+            plan_name = getattr(target_obj, 'name_de', None) or getattr(target_obj, 'name', p.name)
+        else:
+            plan_name = getattr(target_obj, 'name_en', None) or getattr(target_obj, 'name', p.name)
+    if not plan_name and target_obj:
+        plan_name = target_obj.name or p.name
     category = "pass" if p.purchase_type == "session_pass" else (p.subscription_plan.plan_category if p.subscription_plan else "subscription")
     plan_type = p.subscription_plan.plan_type if p.subscription_plan else None
 
@@ -364,7 +375,8 @@ class UserDashboardView(APIView):
         active_subscriptions_list = []
         for p in active_purchases_qs:
             if not p.is_expired:
-                active_subscriptions_list.append(serialize_client_purchase(p))
+                active_lang = request.query_params.get('lang') or request.headers.get('Accept-Language') or request.headers.get('lang') or getattr(request, 'LANGUAGE_CODE', 'en')
+                active_subscriptions_list.append(serialize_client_purchase(p, lang=active_lang))
 
         # 3. Home section calculations
         total_bookings_count = len(all_items)
