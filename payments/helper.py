@@ -130,9 +130,16 @@ def send_booking_confirmation_email(booking, lang=None):
         purchase_info = {}
 
         if hasattr(booking, 'activity') and booking.activity:
-            booking_type_display = f"Activity: {booking.activity.title}"
+            email_category = 'activity'
+            activity_title = (
+                getattr(booking.activity, f'title_{client_lang}', None)
+                or booking.activity.title
+            )
+            booking_type_display = activity_title
             booking_date_display = str(booking.activity.date) if booking.activity.date else "Scheduled Date"
-            booking_time_display = f"{booking.activity.open_time} - {booking.activity.close_time}" if booking.activity.open_time else "Scheduled Time"
+            activity_start = booking.activity.open_time.strftime('%H:%M') if booking.activity.open_time else None
+            activity_end = booking.activity.close_time.strftime('%H:%M') if booking.activity.close_time else None
+            booking_time_display = f"{activity_start} - {activity_end}" if activity_start and activity_end else "Scheduled Time"
             time_slot_display = ""
         elif hasattr(booking, 'sauna_type'):
             booking_type_display = booking.get_sauna_type_display() if hasattr(booking, 'get_sauna_type_display') else str(booking.sauna_type).title()
@@ -271,7 +278,14 @@ def send_booking_confirmation_email(booking, lang=None):
         first_name = full_name.strip().split()[0] if full_name.strip() else 'Guest'
 
         # Adjust subject line based on category
-        if email_category == 'lunchroom':
+        if email_category == 'activity':
+            if client_lang == 'nl':
+                subject = f"Wat leuk dat je erbij bent! ✨ • Heaven on Earth"
+            elif client_lang == 'de':
+                subject = f"Wie schön, dass du dabei bist! ✨ • Heaven on Earth"
+            else:
+                subject = f"How wonderful to have you joining us! ✨ • Heaven on Earth"
+        elif email_category == 'lunchroom':
             if client_lang == 'en':
                 subject = f"How lovely that you're coming to enjoy some time with us! ✨ • Heaven on Earth"
             elif client_lang == 'de':
@@ -317,7 +331,9 @@ def send_booking_confirmation_email(booking, lang=None):
             'is_paid_booking': is_paid_booking,
         }
 
-        if email_category == 'lunchroom':
+        if email_category == 'activity':
+            html_message = render_to_string('email/activity_confirmation_email.html', context)
+        elif email_category == 'lunchroom':
             html_message = render_to_string('email/lunchroom_confirmation_email.html', context)
         elif email_category == 'event':
             html_message = render_to_string('email/event_confirmation_email.html', context)
@@ -327,7 +343,68 @@ def send_booking_confirmation_email(booking, lang=None):
         time_slot_str = f" ({time_slot_display})" if time_slot_display else ""
         total_paid_str = f"\nTotal Paid: €{booking.total_price}" if hasattr(booking, 'total_price') else ""
 
-        if email_category == 'lunchroom':
+        if email_category == 'activity':
+            if client_lang == 'nl':
+                plain_message = (
+                    f"Wat leuk dat je erbij bent! ✨\n\n"
+                    f"Beste {first_name},\n\n"
+                    f"Bedankt voor je reservering bij Heaven on Earth! Wat gezellig dat je binnenkort bij ons langskomt.\n\n"
+                    f"Je betaling is ontvangen en je reservering is definitief bevestigd. Wij kijken ernaar uit om je te verwelkomen!\n\n"
+                    f"Jouw reserveringsgegevens\n"
+                    f"Reserveringsnummer: {booking.booking_id}\n"
+                    f"Activiteit: {booking_type_display}\n"
+                    f"Datum: {booking_date_display}\n"
+                    f"Tijd: {booking_time_display}\n"
+                    f"Aantal personen: {guests_count_display}\n"
+                    f"Totaal betaald: € {booking.total_price}\n\n"
+                    f"We vragen je om 10 tot 15 minuten voor aanvang aanwezig te zijn, zodat je ontspannen aan jouw activiteit kunt beginnen.\n\n"
+                    f"Heb je nog vragen of speciale wensen? Neem gerust contact met ons op. We helpen je graag!\n\n"
+                    f"Tot snel bij Heaven on Earth! ✨\n\n"
+                    f"Met warme groet,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n📞 {contact_phone}"
+                )
+            elif client_lang == 'de':
+                plain_message = (
+                    f"Wie schön, dass du dabei bist! ✨\n\n"
+                    f"Liebe/r {first_name},\n\n"
+                    f"Vielen Dank für deine Reservierung bei Heaven on Earth! Wie schön, dass du uns bald besuchen wirst.\n\n"
+                    f"Deine Zahlung ist bei uns eingegangen und deine Reservierung ist nun verbindlich bestätigt. Wir freuen uns darauf, dich bei uns willkommen zu heißen!\n\n"
+                    f"Deine Reservierungsdetails\n"
+                    f"Reservierungsnummer: {booking.booking_id}\n"
+                    f"Aktivität: {booking_type_display}\n"
+                    f"Datum: {booking_date_display}\n"
+                    f"Uhrzeit: {booking_time_display}\n"
+                    f"Anzahl der Personen: {guests_count_display}\n"
+                    f"Gesamtbetrag bezahlt: € {booking.total_price}\n\n"
+                    f"Wir bitten dich, 10 bis 15 Minuten vor Beginn deiner Aktivität bei uns einzutreffen, damit du ganz entspannt in dein Erlebnis starten kannst.\n\n"
+                    f"Hast du noch Fragen oder besondere Wünsche? Dann kontaktiere uns gerne. Wir helfen dir jederzeit weiter!\n\n"
+                    f"Bis bald bei Heaven on Earth! ✨\n\n"
+                    f"Herzliche Grüße,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n📞 {contact_phone}"
+                )
+            else:
+                plain_message = (
+                    f"How wonderful to have you joining us! ✨\n\n"
+                    f"Dear {first_name},\n\n"
+                    f"Thank you for your reservation at Heaven on Earth! We're delighted that you'll be visiting us soon.\n\n"
+                    f"Your payment has been received, and your reservation is now officially confirmed. We look forward to welcoming you!\n\n"
+                    f"Your Reservation Details\n"
+                    f"Booking number: {booking.booking_id}\n"
+                    f"Activity: {booking_type_display}\n"
+                    f"Date: {booking_date_display}\n"
+                    f"Time: {booking_time_display}\n"
+                    f"Number of guests: {guests_count_display}\n"
+                    f"Total paid: € {booking.total_price}\n\n"
+                    f"We kindly ask you to arrive 10 to 15 minutes before the start of your activity so you can begin your experience in a relaxed and comfortable way.\n\n"
+                    f"Do you have any questions or special requests? Please don't hesitate to contact us. We're always happy to help!\n\n"
+                    f"See you soon at Heaven on Earth! ✨\n\n"
+                    f"Warm regards,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n📞 {contact_phone}"
+                )
+        elif email_category == 'lunchroom':
             if client_lang == 'en':
                 plain_message = (
                     f"How lovely that you're coming to enjoy some time with us! ✨\n\n"

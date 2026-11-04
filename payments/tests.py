@@ -1,9 +1,15 @@
+from datetime import date, time
+from decimal import Decimal
+from types import SimpleNamespace
 from django.test import TestCase
+from django.test import override_settings
+from django.core import mail
 from unittest.mock import patch, MagicMock
 from rest_framework.test import APIClient
 from rest_framework import status
 from bookings.models import SaunaBooking
 from payments.models import Payments
+from payments.helper import send_booking_confirmation_email
 
 
 class PaymentsTestCase(TestCase):
@@ -76,3 +82,65 @@ class PaymentsTestCase(TestCase):
         self.assertEqual(payment.payment_status, 'paid')
         self.assertEqual(self.booking.payment_status, 'paid')
         self.assertEqual(self.booking.status, 'confirmed')
+
+
+class ActivityConfirmationEmailTests(TestCase):
+    def test_activity_confirmation_email_uses_recipient_language(self):
+        localized_content = {
+            'nl': {
+                'subject': 'Wat leuk dat je erbij bent!',
+                'activity': 'Yoga NL',
+                'booking_number': 'Reserveringsnummer:',
+                'total_paid': 'Totaal betaald:',
+                'plain_total_paid': 'Totaal betaald: € 45.00',
+            },
+            'en': {
+                'subject': 'How wonderful to have you joining us!',
+                'activity': 'Yoga EN',
+                'booking_number': 'Booking number:',
+                'total_paid': 'Total paid:',
+                'plain_total_paid': 'Total paid: € 45.00',
+            },
+            'de': {
+                'subject': 'Wie schön, dass du dabei bist!',
+                'activity': 'Yoga DE',
+                'booking_number': 'Reservierungsnummer:',
+                'total_paid': 'Gesamtbetrag bezahlt:',
+                'plain_total_paid': 'Gesamtbetrag bezahlt: € 45.00',
+            },
+        }
+
+        with override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend'):
+            with patch('notifications.views.notify_user'), patch('notifications.views.notify_admins'):
+                for lang, expected in localized_content.items():
+                    booking = SimpleNamespace(
+                        booking_id='ACT-0001',
+                        email=f'{lang}@example.com',
+                        name='Alex Example',
+                        user=SimpleNamespace(language=lang),
+                        activity=SimpleNamespace(
+                            title='Yoga',
+                            title_nl='Yoga NL',
+                            title_en='Yoga EN',
+                            title_de='Yoga DE',
+                            date=date(2026, 11, 4),
+                            open_time=time(10, 0),
+                            close_time=time(11, 0),
+                        ),
+                        capacity=2,
+                        total_price=Decimal('45.00'),
+                        payment_status='paid',
+                        status='confirmed',
+                    )
+
+                    result = send_booking_confirmation_email(booking)
+
+                    self.assertTrue(result['status'])
+                    sent_email = mail.outbox[-1]
+                    html_message = sent_email.alternatives[0][0]
+                    self.assertIn(expected['subject'], sent_email.subject)
+                    self.assertIn(expected['activity'], html_message)
+                    self.assertIn(expected['booking_number'], html_message)
+                    self.assertIn(expected['total_paid'], html_message)
+                    self.assertIn('€ 45.00', html_message)
+                    self.assertIn(expected['plain_total_paid'], sent_email.body)
