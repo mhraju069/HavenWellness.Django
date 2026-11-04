@@ -291,6 +291,7 @@ class GetSlotView(APIView):
         summary="Get available slots for a service (sauna, package, lunchroom, activity, etc.)",
         parameters=[
             OpenApiParameter(name="type", description="Service Type: 'package', 'sauna', 'private_sauna', 'shared_sauna', 'lunchroom', 'activity', 'saltroom'", required=False, type=str),
+            OpenApiParameter(name="package_id", description="Package ID; package slot responses include only its configured services", required=False, type=int),
             OpenApiParameter(name="sub_type", description="Optional Sub-service Type filter for packages (e.g. sauna, private_sauna, shared_sauna, lunchroom, activity)", required=False, type=str),
             OpenApiParameter(name="date", description="Date (YYYY-MM-DD)", required=True, type=str),
         ],
@@ -298,6 +299,7 @@ class GetSlotView(APIView):
     def get(self, request, service_type=None):
         s_type = (service_type or request.query_params.get('type') or '').lower()
         sub_type = (request.query_params.get('sub_type') or '').lower()
+        is_package = s_type in ['package', 'packages']
         date_str = request.query_params.get('date')
 
         if not date_str:
@@ -323,6 +325,71 @@ class GetSlotView(APIView):
                 "data": {},
                 "message": "No slots available for this day. Please choose another date."
             }, status=status.HTTP_200_OK)
+
+        package_services = []
+        if is_package:
+            service_aliases = {
+                'private_sauna': 'private_sauna',
+                'private': 'private_sauna',
+                'vip_sauna': 'private_sauna',
+                'shared_sauna': 'shared_sauna',
+                'shared': 'shared_sauna',
+                'normal_sauna': 'shared_sauna',
+                'sauna': 'sauna',
+                'lunchroom': 'lunchroom',
+                'lunch_room': 'lunchroom',
+                'saltroom': 'saltroom',
+                'salt_room': 'saltroom',
+                'activity': 'activity',
+                'activities': 'activity',
+            }
+            package_id = request.query_params.get('package_id')
+            if package_id:
+                if not package_id.isdigit():
+                    return Response({
+                        "success": False,
+                        "data": {},
+                        "message": "Invalid package_id. Please provide a valid package ID.",
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                package = Packages.objects.filter(pk=int(package_id)).first()
+                if not package:
+                    return Response({
+                        "success": False,
+                        "data": {},
+                        "message": "Package not found.",
+                    }, status=status.HTTP_404_NOT_FOUND)
+                configured_services = package.packages or []
+            elif sub_type:
+                configured_services = [sub_type]
+            else:
+                return Response({
+                    "success": False,
+                    "data": {},
+                    "message": "Provide package_id to get slots for the services included in a package.",
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            for service in configured_services:
+                service_key = str(service).strip().lower().replace('-', '_').replace(' ', '_')
+                normalized_service = service_aliases.get(service_key)
+                if normalized_service and normalized_service not in package_services:
+                    package_services.append(normalized_service)
+
+            if sub_type and package_id:
+                requested_service = service_aliases.get(sub_type.replace('-', '_').replace(' ', '_'))
+                if requested_service not in package_services:
+                    return Response({
+                        "success": True,
+                        "data": {},
+                        "message": "This service is not included in the selected package.",
+                    }, status=status.HTTP_200_OK)
+                package_services = [requested_service]
+
+            if not package_services:
+                return Response({
+                    "success": True,
+                    "data": {},
+                    "message": "No supported booking services are configured for this package.",
+                }, status=status.HTTP_200_OK)
 
         # 2. Determine Service-specific Operating Hours
         sauna_open_t, sauna_close_t, sauna_is_closed = get_service_operating_hours('sauna', target_date)
@@ -485,7 +552,7 @@ class GetSlotView(APIView):
         # E. SALTROOM AVAILABILITY (Session-based, not slot-based)
         # -------------------------------------------------------------
         saltroom_data = None
-        if s_type in ['saltroom', 'package', 'packages'] or sub_type == 'saltroom':
+        if s_type == 'saltroom' or (is_package and 'saltroom' in package_services) or sub_type == 'saltroom':
             saltroom_obj = Saltroom.objects.first()
             user = request.user if request.user and request.user.is_authenticated else None
             user_membership_data = {
@@ -741,8 +808,6 @@ class GetSlotView(APIView):
         # -------------------------------------------------------------
         data = {}
 
-        is_package = s_type in ['package', 'packages']
-
         # Sauna data
         sauna_dict = {
             "is_available": not sauna_is_closed and (len(private_3_hours) > 0 or len(private_4_hours) > 0 or len(shared_slots) > 0),
@@ -768,25 +833,18 @@ class GetSlotView(APIView):
         }
 
         if is_package:
-            # Package slots: Include all sub-services or filtered sub_type
-            if sub_type in ['private_sauna']:
-                data["private_sauna"] = sauna_dict["private_sauna"]
-            elif sub_type in ['shared_sauna']:
-                data["shared_sauna"] = sauna_dict["shared_sauna"]
-            elif sub_type in ['sauna']:
-                data["sauna"] = sauna_dict
-            elif sub_type in ['lunchroom']:
-                data["lunchroom"] = lunchroom_data
-            elif sub_type in ['activity', 'activities']:
-                data["activities"] = activities_data
-            elif sub_type in ['saltroom']:
-                data["saltroom"] = saltroom_data
-            else:
-                # Return combined package slots for all sub-services
-                data["sauna"] = sauna_dict
-                data["lunchroom"] = lunchroom_data
-                data["activities"] = activities_data
-                data["saltroom"] = saltroom_data
+            package_slot_data = {
+                "private_sauna": ("private_sauna", sauna_dict["private_sauna"]),
+                "shared_sauna": ("shared_sauna", sauna_dict["shared_sauna"]),
+                "sauna": ("sauna", sauna_dict),
+                "lunchroom": ("lunchroom", lunchroom_data),
+                "activity": ("activities", activities_data),
+                "saltroom": ("saltroom", saltroom_data),
+            }
+            for service in package_services:
+                response_key, service_data = package_slot_data[service]
+                if service_data is not None:
+                    data[response_key] = service_data
         elif s_type == 'saltroom':
             data = saltroom_data
         elif s_type in ['lunchroom']:
@@ -810,7 +868,7 @@ class GetSlotView(APIView):
             "close_time": header_close_t.strftime("%H:%M"),
             "is_closed": header_is_closed,
             "data": data,
-            "message": "Available Slots",
+            "message": "Available slots for services included in this package." if is_package else "Available Slots",
         }, status=status.HTTP_200_OK)
 
 

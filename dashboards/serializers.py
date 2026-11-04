@@ -211,7 +211,7 @@ class AdminAccessCodeItemSerializer(serializers.Serializer):
     booking_id = serializers.CharField(help_text="Unique booking ID reference, e.g. PS-0070, SS-0001")
     access_code = serializers.CharField(help_text="Access code for entry/gate/sauna, e.g. PS-0070")
     sauna_type = serializers.CharField(help_text="Type of sauna: 'private' or 'shared'")
-    service_name = serializers.CharField(help_text="Display title: 'Private Sauna' or 'Shared Sauna'")
+    service_name = serializers.CharField(help_text="Display title: 'VIP Sauna' or 'Normal Sauna'")
     client_name = serializers.CharField(allow_null=True, required=False, help_text="Full client name")
     client_email = serializers.CharField(allow_null=True, required=False, help_text="Client email address")
     client_phone = serializers.CharField(allow_null=True, required=False, help_text="Client phone number")
@@ -231,8 +231,8 @@ class AdminAccessCodeItemSerializer(serializers.Serializer):
 
 class AdminAccessCodesSummarySerializer(serializers.Serializer):
     total_codes = serializers.IntegerField(help_text="Total access codes count")
-    private_sauna_codes = serializers.IntegerField(help_text="Total Private Sauna access codes")
-    shared_sauna_codes = serializers.IntegerField(help_text="Total Shared Sauna access codes")
+    private_sauna_codes = serializers.IntegerField(help_text="Total VIP Sauna access codes")
+    shared_sauna_codes = serializers.IntegerField(help_text="Total Normal Sauna access codes")
     confirmed_codes = serializers.IntegerField(help_text="Total confirmed active access codes")
 
 

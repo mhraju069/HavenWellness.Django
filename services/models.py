@@ -169,7 +169,7 @@ class SaltroomFeatures(models.Model):
 class Packages(models.Model):
     PACKAGE_TYPE_CHOICES = [
         ('private_sauna', 'VIP Sauna'),
-        ('shared_sauna', 'Sauna'),
+        ('shared_sauna', 'Normal Sauna'),
         ('saltroom', 'Saltroom'),
         ('activity', 'Activity'),
         ('lunchroom', 'Lunchroom'),

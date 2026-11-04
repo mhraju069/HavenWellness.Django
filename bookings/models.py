@@ -7,7 +7,7 @@ User = settings.AUTH_USER_MODEL
 
 class SaunaBooking(models.Model):
     SAUNA_TYPES = (
-        ('shared', 'Sauna'),
+        ('shared', 'Normal Sauna'),
         ('private', 'VIP Sauna'),
     )
 
