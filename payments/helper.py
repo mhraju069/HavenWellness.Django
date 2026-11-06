@@ -125,9 +125,13 @@ def send_booking_confirmation_email(booking, lang=None):
         email_from = getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None)
         recipient_list = [booking.email]
 
-        email_category = 'booking'  # 'booking', 'purchase', 'package', or 'event'
+        email_category = 'booking'  # 'activity', 'lunchroom', 'event', 'package', 'vip_sauna', 'sauna', 'saltroom', 'purchase'
         sub_services_list = []
         purchase_info = {}
+        duration_display = ""
+        is_paid_with_pass = getattr(booking, 'used_pass', False)
+        is_paid_with_subscription = getattr(booking, 'used_subscription', False)
+        is_paid_with_package = getattr(booking, 'payment_status', '') == 'paid_with_package' or getattr(booking, 'status', '') == 'confirmed_with_package'
 
         if hasattr(booking, 'activity') and booking.activity:
             email_category = 'activity'
@@ -142,10 +146,36 @@ def send_booking_confirmation_email(booking, lang=None):
             booking_time_display = f"{activity_start} - {activity_end}" if activity_start and activity_end else "Scheduled Time"
             time_slot_display = ""
         elif hasattr(booking, 'sauna_type'):
-            booking_type_display = booking.get_sauna_type_display() if hasattr(booking, 'get_sauna_type_display') else str(booking.sauna_type).title()
+            # Check whether VIP Sauna or Shared/Normal Sauna
+            start_str = booking.booking_time.strftime('%H:%M') if booking.booking_time else ""
+            end_str = ""
+            time_slot_val = getattr(booking, 'time_slot', '3_hours')
+            duration_minutes = 90 if time_slot_val == '90_mins' else (240 if time_slot_val == '4_hours' else 180)
+
+            if client_lang == 'nl':
+                duration_display = "90 minuten" if duration_minutes == 90 else (f"{duration_minutes // 60} uur")
+            elif client_lang == 'de':
+                duration_display = "90 Minuten" if duration_minutes == 90 else (f"{duration_minutes // 60} Stunden")
+            else:
+                duration_display = "90 minutes" if duration_minutes == 90 else (f"{duration_minutes // 60} hours")
+
+            if booking.booking_time:
+                from datetime import datetime as dt_cls, timedelta as dt_delta
+                dummy_dt = dt_cls.combine(booking.booking_date, booking.booking_time)
+                calc_end = (dummy_dt + dt_delta(minutes=duration_minutes)).time()
+                end_str = calc_end.strftime('%H:%M')
+
+            booking_time_display = f"{start_str} – {end_str}" if (start_str and end_str) else (start_str or "Scheduled Time")
             booking_date_display = str(booking.booking_date)
-            booking_time_display = str(booking.booking_time)
             time_slot_display = booking.get_time_slot_display() if hasattr(booking, 'get_time_slot_display') else str(getattr(booking, 'time_slot', ''))
+
+            if booking.sauna_type == 'private':
+                email_category = 'vip_sauna'
+                booking_type_display = 'VIP Sauna'
+            else:
+                email_category = 'sauna'
+                booking_type_display = 'Sauna'
+
         elif hasattr(booking, 'booked_services_ids') or (hasattr(booking, 'booking_id') and booking.booking_id.startswith('PKG-')):
             email_category = 'package'
             is_custom = getattr(booking, 'is_custom', False)
@@ -167,11 +197,11 @@ def send_booking_confirmation_email(booking, lang=None):
                         elif service_type in ['shared', 'shared_sauna']:
                             service_title = 'Sauna'
                         elif service_type in ['saltroom', 'salt_room']:
-                            service_title = 'Salt Room'
+                            service_title = 'Salt Room' if client_lang == 'en' else ('Salzkammer' if client_lang == 'de' else 'Zoutkamer')
                         elif service_type == 'lunchroom':
                             service_title = 'Lunchroom'
                         elif service_type == 'activity':
-                            service_title = 'Activity'
+                            service_title = 'Activity' if client_lang == 'en' else ('Aktivität' if client_lang == 'de' else 'Activiteit')
                         else:
                             service_title = str(service_type).replace('_', ' ').title()
 
@@ -183,8 +213,8 @@ def send_booking_confirmation_email(booking, lang=None):
                         elif ref_id.startswith('SR-'):
                             sr_obj = SaltRoomBooking.objects.filter(booking_id=ref_id).first()
                             if sr_obj and sr_obj.start_time:
-                                end_str = f" - {sr_obj.end_time.strftime('%H:%M')}" if sr_obj.end_time else ""
-                                time_str = f" @ {sr_obj.start_time.strftime('%H:%M')}{end_str}"
+                                end_time_str = f" - {sr_obj.end_time.strftime('%H:%M')}" if sr_obj.end_time else ""
+                                time_str = f" @ {sr_obj.start_time.strftime('%H:%M')}{end_time_str}"
                         elif ref_id.startswith('LR-'):
                             l_obj = LunchroomBooking.objects.filter(booking_id=ref_id).first()
                             if l_obj and l_obj.booking_time:
@@ -215,7 +245,7 @@ def send_booking_confirmation_email(booking, lang=None):
                 purchase_info = {
                     'total_sessions': booking.total_sessions or 10,
                     'remaining_sessions': booking.remaining_sessions if booking.remaining_sessions is not None else 10,
-                    'validity': "Unlimited",
+                    'validity': "Unlimited" if client_lang == 'en' else ("Unbegrenzt" if client_lang == 'de' else "Onbeperkt"),
                 }
             else:
                 plan_name = booking.subscription_plan.name if booking.subscription_plan else "Subscription Plan"
@@ -238,16 +268,18 @@ def send_booking_confirmation_email(booking, lang=None):
             booking_time_display = f"{booking.start_time} - {booking.end_time}"
             time_slot_display = ""
         elif hasattr(booking, 'start_time') and hasattr(booking, 'date') and (hasattr(booking, 'used_pass') or booking.booking_id.startswith('SR-')):
-            booking_type_display = 'Saltroom Session'
+            email_category = 'saltroom'
+            start_str = booking.start_time.strftime('%H:%M') if hasattr(booking.start_time, 'strftime') else str(booking.start_time)[:5]
+            end_str = booking.end_time.strftime('%H:%M') if hasattr(booking.end_time, 'strftime') else str(booking.end_time)[:5]
+            booking_time_display = f"{start_str} – {end_str}" if (start_str and end_str) else (start_str or "Scheduled Time")
             booking_date_display = str(booking.date)
-            booking_time_display = f"{booking.start_time} - {booking.end_time}"
             time_slot_display = "Saltroom"
-            if getattr(booking, 'payment_status', '') == 'paid_with_package':
-                booking_type_display = 'Saltroom (Included in Package)'
-            elif getattr(booking, 'used_pass', False):
-                booking_type_display = 'Saltroom Session (Paid with Pass)'
-            elif getattr(booking, 'used_subscription', False):
-                booking_type_display = 'Saltroom Session (Subscription)'
+            if client_lang == 'nl':
+                booking_type_display = 'Zoutkamer & Halotherapie'
+            elif client_lang == 'de':
+                booking_type_display = 'Salzkammer & Halotherapie'
+            else:
+                booking_type_display = 'Salt Room & Halotherapy'
         elif hasattr(booking, 'booking_date') and hasattr(booking, 'booking_time') and getattr(booking, 'booking_id', '').startswith('LR-'):
             email_category = 'lunchroom'
             booking_type_display = 'Lunchroom'
@@ -259,9 +291,6 @@ def send_booking_confirmation_email(booking, lang=None):
             booking_date_display = str(getattr(booking, 'booking_date', ''))
             booking_time_display = str(getattr(booking, 'booking_time', ''))
             time_slot_display = ""
-
-        # Check if booking is paid with package
-        is_paid_with_package = getattr(booking, 'payment_status', '') == 'paid_with_package' or getattr(booking, 'status', '') == 'confirmed_with_package'
 
         guests_count_display = getattr(booking, 'guests', None) or getattr(booking, 'capacity', 1)
         is_paid_booking = hasattr(booking, 'total_price') and float(getattr(booking, 'total_price', 0)) > 0
@@ -292,6 +321,34 @@ def send_booking_confirmation_email(booking, lang=None):
                 subject = f"Wie schön, dass Sie bei uns eine genussvolle Zeit verbringen möchten! ✨ • Heaven on Earth"
             else:
                 subject = f"Wat leuk dat je bij ons komt genieten! ✨ • Heaven on Earth"
+        elif email_category == 'package':
+            if client_lang == 'nl':
+                subject = f"Wat leuk dat je bij ons komt genieten! ✨ • Heaven on Earth"
+            elif client_lang == 'de':
+                subject = f"Wie schön, dass du bei uns genießt! ✨ • Heaven on Earth"
+            else:
+                subject = f"How lovely that you're joining us to enjoy! ✨ • Heaven on Earth"
+        elif email_category == 'vip_sauna':
+            if client_lang == 'nl':
+                subject = f"Een heerlijk moment van ontspanning wacht op je! ✨ • Heaven on Earth"
+            elif client_lang == 'de':
+                subject = f"Ein herrlicher Moment der Entspannung wartet auf dich! ✨ • Heaven on Earth"
+            else:
+                subject = f"A wonderful moment of relaxation awaits you! ✨ • Heaven on Earth"
+        elif email_category == 'sauna':
+            if client_lang == 'nl':
+                subject = f"Jouw moment van ontspanning is gereserveerd! ✨ • Heaven on Earth"
+            elif client_lang == 'de':
+                subject = f"Dein Moment der Entspannung ist reserviert! ✨ • Heaven on Earth"
+            else:
+                subject = f"Your moment of relaxation is reserved! ✨ • Heaven on Earth"
+        elif email_category == 'saltroom':
+            if client_lang == 'nl':
+                subject = f"Ontdek de bijzondere ervaring van halotherapie! ✨ • Heaven on Earth"
+            elif client_lang == 'de':
+                subject = f"Entdecke die besondere Erfahrung der Halotherapie! ✨ • Heaven on Earth"
+            else:
+                subject = f"Discover the special experience of halotherapy! ✨ • Heaven on Earth"
         elif email_category == 'event':
             if client_lang == 'nl':
                 subject = f"Aanvraag ontvangen! Referentie: {booking.booking_id} • Heaven on Earth"
@@ -301,15 +358,26 @@ def send_booking_confirmation_email(booking, lang=None):
                 subject = f"Enquiry Received! Reference: {booking.booking_id} • Heaven on Earth"
         elif email_category == 'purchase':
             if getattr(booking, 'purchase_type', '') == 'session_pass':
-                subject = f"Pass Confirmed! Reference: {booking.purchase_id} • Haven Wellness"
+                if client_lang == 'nl':
+                    subject = f"Strippenkaart bevestigd! Referentie: {booking.purchase_id} • Heaven on Earth"
+                elif client_lang == 'de':
+                    subject = f"Mehrfachkarte bestätigt! Referenz: {booking.purchase_id} • Heaven on Earth"
+                else:
+                    subject = f"Pass Confirmed! Reference: {booking.purchase_id} • Heaven on Earth"
             else:
-                subject = f"Subscription Confirmed! Reference: {booking.purchase_id} • Haven Wellness"
-        elif email_category == 'package':
-            subject = f"Package Booking Confirmed! Reference: {booking.booking_id} • Haven Wellness"
-        elif is_paid_with_package:
-            subject = f"Package Reservation Confirmed! Reference: {booking.booking_id} • Haven Wellness"
+                if client_lang == 'nl':
+                    subject = f"Abonnement bevestigd! Referentie: {booking.purchase_id} • Heaven on Earth"
+                elif client_lang == 'de':
+                    subject = f"Abonnement bestätigt! Referenz: {booking.purchase_id} • Heaven on Earth"
+                else:
+                    subject = f"Subscription Confirmed! Reference: {booking.purchase_id} • Heaven on Earth"
         else:
-            subject = f"Booking Confirmed! Reference: {booking.booking_id} • Haven Wellness"
+            if client_lang == 'nl':
+                subject = f"Reservering bevestigd! Referentie: {booking_id} • Heaven on Earth"
+            elif client_lang == 'de':
+                subject = f"Reservierung bestätigt! Referenz: {booking_id} • Heaven on Earth"
+            else:
+                subject = f"Booking Confirmed! Reference: {booking_id} • Heaven on Earth"
 
         context = {
             'booking': booking,
@@ -321,8 +389,11 @@ def send_booking_confirmation_email(booking, lang=None):
             'contact_email': contact_email,
             'email_category': email_category,
             'is_paid_with_package': is_paid_with_package,
+            'is_paid_with_pass': is_paid_with_pass,
+            'is_paid_with_subscription': is_paid_with_subscription,
             'sub_services_list': sub_services_list,
             'purchase_info': purchase_info,
+            'duration_display': duration_display,
             'booking_type_display': booking_type_display,
             'booking_date_display': booking_date_display,
             'booking_time_display': booking_time_display,
@@ -337,6 +408,16 @@ def send_booking_confirmation_email(booking, lang=None):
             html_message = render_to_string('email/lunchroom_confirmation_email.html', context)
         elif email_category == 'event':
             html_message = render_to_string('email/event_confirmation_email.html', context)
+        elif email_category == 'package':
+            html_message = render_to_string('email/package_confirmation_email.html', context)
+        elif email_category == 'vip_sauna':
+            html_message = render_to_string('email/vip_sauna_confirmation_email.html', context)
+        elif email_category == 'sauna':
+            html_message = render_to_string('email/sauna_confirmation_email.html', context)
+        elif email_category == 'saltroom':
+            html_message = render_to_string('email/saltroom_confirmation_email.html', context)
+        elif email_category == 'purchase':
+            html_message = render_to_string('email/purchase_confirmation_email.html', context)
         else:
             html_message = render_to_string('email/booking_confirmation_email.html', context)
 
@@ -493,19 +574,357 @@ def send_booking_confirmation_email(booking, lang=None):
                     f"Warm regards,\n\n"
                     f"The Heaven on Earth Team"
                 )
-        else:
-            if email_category == 'purchase':
-                intro_plain = "Thank you for your purchase. Your pass/subscription has been activated and linked to your account."
-            elif email_category == 'package':
-                intro_plain = "Thank you for booking with us. Your package experience has been confirmed."
-            elif is_paid_with_package:
-                intro_plain = "Your reservation has been confirmed as part of your package experience."
+        elif email_category == 'package':
+            if client_lang == 'nl':
+                plain_message = (
+                    f"Wat leuk dat je bij ons komt genieten! ✨\n\n"
+                    f"Beste {first_name},\n\n"
+                    f"Bedankt voor je reservering bij Heaven on Earth! Wat fijn dat je hebt gekozen voor een van onze arrangementen.\n\n"
+                    f"We kijken ernaar uit je te verwelkomen voor een heerlijke ervaring vol ontspanning, gezelligheid en genieten.\n\n"
+                    f"Jouw reserveringsgegevens:\n\n"
+                    f"- Reserveringsnummer: {booking.booking_id}\n"
+                    f"- Arrangement: {booking_type_display}\n"
+                    f"- Datum: {booking_date_display}\n"
+                    f"- Aantal personen: {guests_count_display}\n"
+                    f"- Inbegrepen activiteiten en tijden: {', '.join(sub_services_list) if sub_services_list else 'Inclusief'}\n"
+                    f"- Totaal betaald: € {booking.total_price}\n\n"
+                    f"Je reservering is bevestigd en we zorgen ervoor dat alles voor je klaarstaat.\n\n"
+                    f"Heb je nog vragen of speciale wensen? Neem gerust contact met ons op. We denken graag met je mee.\n\n"
+                    f"Tot snel bij Heaven on Earth, waar genieten samenkomt! ✨\n\n"
+                    f"Met warme groet,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}"
+                )
+            elif client_lang == 'de':
+                plain_message = (
+                    f"Wie schön, dass du bei uns genießt! ✨\n\n"
+                    f"Liebe/r {first_name},\n\n"
+                    f"vielen Dank für deine Reservierung bei Heaven on Earth! Wie schön, dass du dich für eines unserer Arrangements entschieden hast.\n\n"
+                    f"Wir freuen uns darauf, dich zu einem wunderbaren Erlebnis voller Entspannung, Gemütlichkeit und Genuss willkommen zu heißen.\n\n"
+                    f"Deine Reservierungsdetails:\n\n"
+                    f"- Reservierungsnummer: {booking.booking_id}\n"
+                    f"- Arrangement: {booking_type_display}\n"
+                    f"- Datum: {booking_date_display}\n"
+                    f"- Anzahl der Personen: {guests_count_display}\n"
+                    f"- Enthaltene Aktivitäten und Zeiten: {', '.join(sub_services_list) if sub_services_list else 'Inbegriffen'}\n"
+                    f"- Gesamtbetrag bezahlt: € {booking.total_price}\n\n"
+                    f"Deine Reservierung ist bestätigt und wir sorgen dafür, dass alles für dich bereitsteht.\n\n"
+                    f"Hast du noch Fragen oder besondere Wünsche? Kontaktiere uns gerne. Wir denken gerne mit dir mit.\n\n"
+                    f"Bis bald bei Heaven on Earth, wo Genuss zusammenkommt! ✨\n\n"
+                    f"Herzliche Grüße,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}"
+                )
             else:
-                intro_plain = "Thank you for choosing Haven Wellness! Your booking has been confirmed."
+                plain_message = (
+                    f"How lovely that you're joining us to enjoy! ✨\n\n"
+                    f"Dear {first_name},\n\n"
+                    f"Thank you for your reservation at Heaven on Earth! We are delighted that you have chosen one of our packages.\n\n"
+                    f"We look forward to welcoming you for a wonderful experience full of relaxation, warmth, and enjoyment.\n\n"
+                    f"Your reservation details:\n\n"
+                    f"- Booking number: {booking.booking_id}\n"
+                    f"- Package: {booking_type_display}\n"
+                    f"- Date: {booking_date_display}\n"
+                    f"- Number of guests: {guests_count_display}\n"
+                    f"- Included activities and times: {', '.join(sub_services_list) if sub_services_list else 'Included'}\n"
+                    f"- Total paid: € {booking.total_price}\n\n"
+                    f"Your reservation is confirmed and we will ensure that everything is ready for you.\n\n"
+                    f"Do you have any questions or special requests? Please feel free to contact us. We are happy to help.\n\n"
+                    f"See you soon at Heaven on Earth, where enjoyment comes together! ✨\n\n"
+                    f"Warm regards,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}"
+                )
+        elif email_category == 'vip_sauna':
+            extras_str = ", ".join(booking.get_feature_names()) if hasattr(booking, 'get_feature_names') and booking.get_feature_names() else ("Geen" if client_lang == 'nl' else ("Keine" if client_lang == 'de' else "None"))
+            paid_str = "Inbegrepen in arrangement" if is_paid_with_package and client_lang == 'nl' else (f"€ {booking.total_price}")
 
+            if client_lang == 'nl':
+                plain_message = (
+                    f"Een heerlijk moment van ontspanning wacht op je! ✨\n\n"
+                    f"Beste {first_name},\n\n"
+                    f"Wat leuk dat je hebt gekozen voor onze VIP Sauna bij Heaven on Earth!\n\n"
+                    f"Je betaling is ontvangen en je reservering is bevestigd. Binnenkort is het tijd om even helemaal tot rust te komen en te genieten van een moment voor jezelf en je gezelschap.\n\n"
+                    f"Jouw reserveringsgegevens:\n\n"
+                    f"- Reserveringsnummer: {booking.booking_id}\n"
+                    f"- Ervaring: VIP Sauna\n"
+                    f"- Datum: {booking_date_display}\n"
+                    f"- Tijd: {booking_time_display}\n"
+                    f"- Aantal personen: {guests_count_display}\n"
+                    f"- Extra's: {extras_str}\n"
+                    f"- Totaal betaald: {paid_str}\n\n"
+                    f"Tijdens je bezoek geniet je in alle privacy van onze sfeervolle sauna en heerlijke faciliteiten. Alles staat voor je klaar om er een ontspannen ervaring van te maken.\n\n"
+                    f"Heb je nog vragen of speciale wensen? Neem gerust contact met ons op. We helpen je graag.\n\n"
+                    f"We kijken ernaar uit je te verwelkomen bij Heaven on Earth! ✨\n\n"
+                    f"Met warme groet,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}"
+                )
+            elif client_lang == 'de':
+                plain_message = (
+                    f"Ein herrlicher Moment der Entspannung wartet auf dich! ✨\n\n"
+                    f"Liebe/r {first_name},\n\n"
+                    f"wie schön, dass du dich für unsere VIP Sauna bei Heaven on Earth entschieden hast!\n\n"
+                    f"Deine Zahlung ist eingegangen und deine Reservierung ist bestätigt. Bald ist es Zeit, vollkommen zur Ruhe zu kommen und einen Moment für dich und deine Begleitung zu genießen.\n\n"
+                    f"Deine Reservierungsdetails:\n\n"
+                    f"- Reservierungsnummer: {booking.booking_id}\n"
+                    f"- Erlebnis: VIP Sauna\n"
+                    f"- Datum: {booking_date_display}\n"
+                    f"- Uhrzeit: {booking_time_display}\n"
+                    f"- Anzahl der Personen: {guests_count_display}\n"
+                    f"- Extras: {extras_str}\n"
+                    f"- Gesamtbetrag bezahlt: € {booking.total_price}\n\n"
+                    f"Während deines Besuchs genießt du in vollkommener Privatsphäre unsere stimmungsvolle Sauna und die wunderbaren Einrichtungen. Alles steht für dich bereit, um deinen Aufenthalt zu einem entspannenden Erlebnis zu machen.\n\n"
+                    f"Hast du noch Fragen oder besondere Wünsche? Kontaktiere uns gerne. Wir helfen dir gerne weiter.\n\n"
+                    f"Wir freuen uns darauf, dich bei Heaven on Earth willkommen zu heißen! ✨\n\n"
+                    f"Herzliche Grüße,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}"
+                )
+            else:
+                plain_message = (
+                    f"A wonderful moment of relaxation awaits you! ✨\n\n"
+                    f"Dear {first_name},\n\n"
+                    f"How wonderful that you have chosen our VIP Sauna at Heaven on Earth!\n\n"
+                    f"Your payment has been received and your reservation is confirmed. Soon it will be time to completely unwind and enjoy a moment for yourself and your company.\n\n"
+                    f"Your reservation details:\n\n"
+                    f"- Booking number: {booking.booking_id}\n"
+                    f"- Experience: VIP Sauna\n"
+                    f"- Date: {booking_date_display}\n"
+                    f"- Time: {booking_time_display}\n"
+                    f"- Number of guests: {guests_count_display}\n"
+                    f"- Add-ons: {extras_str}\n"
+                    f"- Total paid: € {booking.total_price}\n\n"
+                    f"During your visit, you will enjoy our atmospheric sauna and wonderful facilities in complete privacy. Everything is ready for you to have a relaxing experience.\n\n"
+                    f"Do you have any questions or special requests? Please feel free to contact us. We are happy to help.\n\n"
+                    f"We look forward to welcoming you to Heaven on Earth! ✨\n\n"
+                    f"Warm regards,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}"
+                )
+        elif email_category == 'sauna':
+            dur_text = duration_display or ("90 minuten" if client_lang == 'nl' else ("90 Minuten" if client_lang == 'de' else "90 minutes"))
+            paid_str = "Inbegrepen in arrangement" if is_paid_with_package and client_lang == 'nl' else (f"€ {booking.total_price}")
+
+            if client_lang == 'nl':
+                plain_message = (
+                    f"Jouw moment van ontspanning is gereserveerd! ✨\n\n"
+                    f"Beste {first_name},\n\n"
+                    f"Wat leuk dat je binnenkort bij ons komt genieten!\n\n"
+                    f"Je betaling is ontvangen en je reservering voor onze sauna is bevestigd.\n\n"
+                    f"Laat de dagelijkse drukte even achter je en geniet van een heerlijk moment van rust, warmte en ontspanning.\n\n"
+                    f"Jouw reserveringsgegevens:\n\n"
+                    f"- Reserveringsnummer: {booking.booking_id}\n"
+                    f"- Ervaring: Sauna\n"
+                    f"- Datum: {booking_date_display}\n"
+                    f"- Tijd: {booking_time_display}\n"
+                    f"- Duur: {dur_text}\n"
+                    f"- Aantal personen: {guests_count_display}\n"
+                    f"- Totaal betaald: {paid_str}\n\n"
+                    f"Goed om te weten\n\n"
+                    f"We vragen je om 15 minuten voor aanvang aanwezig te zijn, zodat je rustig kunt aankomen.\n\n"
+                    f"In onze sauna is het dragen van badkleding verplicht. Vergeet daarom niet je badkleding, handdoek en slippers mee te nemen.\n\n"
+                    f"Heb je nog vragen of speciale wensen? Neem gerust contact met ons op. We helpen je graag.\n\n"
+                    f"We kijken ernaar uit je te verwelkomen bij Heaven on Earth! ✨\n\n"
+                    f"Met warme groet,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}"
+                )
+            elif client_lang == 'de':
+                plain_message = (
+                    f"Dein Moment der Entspannung ist reserviert! ✨\n\n"
+                    f"Liebe/r {first_name},\n\n"
+                    f"wie schön, dass du uns bald besuchen und genießen wirst!\n\n"
+                    f"Deine Zahlung ist eingegangen und deine Reservierung für unsere Sauna ist bestätigt.\n\n"
+                    f"Lass die Hektik des Alltags hinter dir und genieße einen herrlichen Moment der Ruhe, Wärme und Entspannung.\n\n"
+                    f"Deine Reservierungsdetails:\n\n"
+                    f"- Reservierungsnummer: {booking.booking_id}\n"
+                    f"- Erlebnis: Sauna\n"
+                    f"- Datum: {booking_date_display}\n"
+                    f"- Uhrzeit: {booking_time_display}\n"
+                    f"- Dauer: {dur_text}\n"
+                    f"- Anzahl der Personen: {guests_count_display}\n"
+                    f"- Gesamtbetrag bezahlt: € {booking.total_price}\n\n"
+                    f"Gut zu wissen\n\n"
+                    f"Wir bitten dich, 15 Minuten vor Beginn einzutreffen, damit du ganz entspannt ankommen kannst.\n\n"
+                    f"In unserer Sauna ist das Tragen von Badebekleidung Pflicht. Bitte denke daran, Badebekleidung, Handtuch und Badeschlappen mitzubringen.\n\n"
+                    f"Hast du noch Fragen oder besondere Wünsche? Kontaktiere uns gerne. Wir helfen dir gerne weiter.\n\n"
+                    f"Wir freuen uns darauf, dich bei Heaven on Earth willkommen zu heißen! ✨\n\n"
+                    f"Herzliche Grüße,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}"
+                )
+            else:
+                plain_message = (
+                    f"Your moment of relaxation is reserved! ✨\n\n"
+                    f"Dear {first_name},\n\n"
+                    f"How lovely that you are coming to enjoy your time with us soon!\n\n"
+                    f"Your payment has been received and your reservation for our sauna is confirmed.\n\n"
+                    f"Leave the daily hustle and bustle behind and indulge in a wonderful moment of peace, warmth, and relaxation.\n\n"
+                    f"Your reservation details:\n\n"
+                    f"- Booking number: {booking.booking_id}\n"
+                    f"- Experience: Sauna\n"
+                    f"- Date: {booking_date_display}\n"
+                    f"- Time: {booking_time_display}\n"
+                    f"- Duration: {dur_text}\n"
+                    f"- Number of guests: {guests_count_display}\n"
+                    f"- Total paid: € {booking.total_price}\n\n"
+                    f"Good to know\n\n"
+                    f"We kindly ask you to arrive 15 minutes before your scheduled start time so you can settle in comfortably.\n\n"
+                    f"Wearing swimwear is mandatory in our sauna. Please don't forget to bring your swimwear, towel, and slippers.\n\n"
+                    f"Do you have any questions or special requests? Please don't hesitate to contact us. We are happy to help.\n\n"
+                    f"We look forward to welcoming you to Heaven on Earth! ✨\n\n"
+                    f"Warm regards,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}"
+                )
+        elif email_category == 'saltroom':
+            paid_str = "Inbegrepen in arrangement" if is_paid_with_package and client_lang == 'nl' else (
+                "Betaald met strippenkaart" if is_paid_with_pass and client_lang == 'nl' else (
+                    "Inbegrepen in abonnement" if is_paid_with_subscription and client_lang == 'nl' else (
+                        f"€ {booking.total_price}"
+                    )
+                )
+            )
+
+            if client_lang == 'nl':
+                plain_message = (
+                    f"Ontdek de bijzondere ervaring van halotherapie! ✨\n\n"
+                    f"Beste {first_name},\n\n"
+                    f"Wat leuk dat je binnenkort bij ons komt genieten!\n\n"
+                    f"Je betaling is ontvangen en je reservering voor onze zoutkamer is bevestigd.\n\n"
+                    f"In onze sfeervolle zoutkamer ervaar je de bijzondere combinatie van een ontspannen omgeving en de fijne zoutdeeltjes die tijdens de halotherapie in de ruimte worden verspreid.\n\n"
+                    f"Een heerlijk moment om even de dagelijkse drukte achter je te laten en bewust tijd voor jezelf te nemen.\n\n"
+                    f"Jouw reserveringsgegevens:\n\n"
+                    f"- Reserveringsnummer: {booking.booking_id}\n"
+                    f"- Ervaring: Zoutkamer & Halotherapie\n"
+                    f"- Datum: {booking_date_display}\n"
+                    f"- Tijd: {booking_time_display}\n"
+                    f"- Aantal personen: {guests_count_display}\n"
+                    f"- Totaal betaald: {paid_str}\n\n"
+                    f"Goed om te weten\n\n"
+                    f"We vragen je om 10 minuten voor aanvang aanwezig te zijn, zodat je rustig kunt aankomen en ontspannen aan je sessie kunt beginnen.\n\n"
+                    f"Draag bij voorkeur comfortabele kleding waarin je prettig kunt ontspannen.\n\n"
+                    f"Heb je nog vragen of speciale wensen? Neem gerust contact met ons op. We helpen je graag!\n\n"
+                    f"We kijken ernaar uit je te verwelkomen bij Heaven on Earth! ✨\n\n"
+                    f"Met warme groet,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}"
+                )
+            elif client_lang == 'de':
+                plain_message = (
+                    f"Entdecke die besondere Erfahrung der Halotherapie! ✨\n\n"
+                    f"Liebe/r {first_name},\n\n"
+                    f"wie schön, dass du uns bald besuchen und genießen wirst!\n\n"
+                    f"Deine Zahlung ist eingegangen und deine Reservierung für unsere Salzkammer ist bestätigt.\n\n"
+                    f"In unserer stimmungsvollen Salzkammer erlebst du die besondere Kombination aus einer entspannenden Atmosphäre und feinsten Salzpartikeln, die während der Halotherapie im Raum verteilt werden.\n\n"
+                    f"Ein herrlicher Moment, um die Hektik des Alltags hinter sich zu lassen und sich bewusst Zeit für sich selbst zu nehmen.\n\n"
+                    f"Deine Reservierungsdetails:\n\n"
+                    f"- Reservierungsnummer: {booking.booking_id}\n"
+                    f"- Erlebnis: Salzkammer & Halotherapie\n"
+                    f"- Datum: {booking_date_display}\n"
+                    f"- Uhrzeit: {booking_time_display}\n"
+                    f"- Anzahl der Personen: {guests_count_display}\n"
+                    f"- Gesamtbetrag bezahlt: € {booking.total_price}\n\n"
+                    f"Gut zu wissen\n\n"
+                    f"Wir bitten dich, 10 Minuten vor Beginn einzutreffen, damit du ganz entspannt ankommen und deine Sitzung beginnen kannst.\n\n"
+                    f"Trage vorzugsweise bequeme Kleidung, in der du dich wohlfühlst und gut entspannen kannst.\n\n"
+                    f"Hast du noch Fragen oder besondere Wünsche? Kontaktiere uns gerne. Wir helfen dir gerne weiter!\n\n"
+                    f"Wir freuen uns darauf, dich bei Heaven on Earth willkommen zu heißen! ✨\n\n"
+                    f"Herzliche Grüße,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}"
+                )
+            else:
+                plain_message = (
+                    f"Discover the special experience of halotherapy! ✨\n\n"
+                    f"Dear {first_name},\n\n"
+                    f"How lovely that you will be visiting us soon to unwind and enjoy!\n\n"
+                    f"Your payment has been received and your reservation for our salt room is confirmed.\n\n"
+                    f"In our atmospheric salt room, you will experience the unique combination of a soothing ambiance and the fine micro-salt particles dispersed throughout the space during halotherapy.\n\n"
+                    f"A wonderful moment to leave everyday stress behind and intentionally dedicate time to your wellbeing.\n\n"
+                    f"Your reservation details:\n\n"
+                    f"- Booking number: {booking.booking_id}\n"
+                    f"- Experience: Salt Room & Halotherapy\n"
+                    f"- Date: {booking_date_display}\n"
+                    f"- Time: {booking_time_display}\n"
+                    f"- Number of guests: {guests_count_display}\n"
+                    f"- Total paid: € {booking.total_price}\n\n"
+                    f"Good to know\n\n"
+                    f"We kindly ask you to arrive 10 minutes prior to your session so you can arrive relaxed and ready.\n\n"
+                    f"Please wear comfortable clothing that allows you to fully relax.\n\n"
+                    f"Do you have any questions or special requests? Please don't hesitate to reach out. We are delighted to assist!\n\n"
+                    f"We look forward to welcoming you to Heaven on Earth! ✨\n\n"
+                    f"Warm regards,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}"
+                )
+        elif email_category == 'purchase':
+            product_label = getattr(booking, 'purchase_type', '')
+            if client_lang == 'nl':
+                plain_message = (
+                    f"Bedankt voor je aankoop bij Heaven on Earth! ✨\n\n"
+                    f"Beste {first_name},\n\n"
+                    f"Je betaling is ontvangen en je aankoop is geactiveerd.\n\n"
+                    f"Aankoopgegevens:\n\n"
+                    f"- Referentienummer: {booking.purchase_id}\n"
+                    f"- Product: {booking_type_display}\n"
+                    f"- Totaal betaald: € {booking.total_price}\n\n"
+                    f"Je kunt je sessies en reserveringen op elk moment bekijken en beheren via je persoonlijke dashboard.\n\n"
+                    f"Tot snel bij Heaven on Earth! ✨\n\n"
+                    f"Met warme groet,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}"
+                )
+            elif client_lang == 'de':
+                plain_message = (
+                    f"Vielen Dank für deinen Kauf bei Heaven on Earth! ✨\n\n"
+                    f"Liebe/r {first_name},\n\n"
+                    f"deine Zahlung ist eingegangen und dein Kauf wurde aktiviert.\n\n"
+                    f"Kaufdetails:\n\n"
+                    f"- Referenz-ID: {booking.purchase_id}\n"
+                    f"- Produkt: {booking_type_display}\n"
+                    f"- Gesamtbetrag bezahlt: € {booking.total_price}\n\n"
+                    f"Du kannst deine Sitzungen und Reservierungen jederzeit in deinem Kunden-Dashboard einsehen und verwalten.\n\n"
+                    f"Bis bald bei Heaven on Earth! ✨\n\n"
+                    f"Herzliche Grüße,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}"
+                )
+            else:
+                plain_message = (
+                    f"Thank you for your purchase at Heaven on Earth! ✨\n\n"
+                    f"Dear {first_name},\n\n"
+                    f"Your payment has been received and your purchase is activated.\n\n"
+                    f"Purchase details:\n\n"
+                    f"- Purchase ID: {booking.purchase_id}\n"
+                    f"- Product: {booking_type_display}\n"
+                    f"- Total paid: € {booking.total_price}\n\n"
+                    f"You can view and manage your passes and reservations anytime in your customer dashboard.\n\n"
+                    f"See you soon at Heaven on Earth! ✨\n\n"
+                    f"Warm regards,\n\n"
+                    f"Team Heaven on Earth\n"
+                    f"📍 {contact_address}\n"
+                    f"📞 {contact_phone}"
+                )
+        else:
             plain_message = (
                 f"Hello {booking.name},\n\n"
-                f"{intro_plain}\n\n"
+                f"Thank you for your reservation at Heaven on Earth! Your booking has been confirmed.\n\n"
                 f"Reference ID: {booking.booking_id}\n"
                 f"Type: {booking_type_display}\n"
                 f"Date: {booking_date_display}\n"

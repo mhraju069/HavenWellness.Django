@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="{{ lang|default:'nl' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        {% if lang == 'nl' %}
+            {% if booking.purchase_type == 'session_pass' %}Strippenkaart bevestigd{% else %}Abonnement bevestigd{% endif %} - Heaven on Earth
+        {% elif lang == 'de' %}
+            {% if booking.purchase_type == 'session_pass' %}Mehrfachkarte bestätigt{% else %}Abonnement bestätigt{% endif %} - Heaven on Earth
+        {% else %}
+            {% if booking.purchase_type == 'session_pass' %}Session Pass Confirmed{% else %}Subscription Confirmed{% endif %} - Heaven on Earth
+        {% endif %}
+    </title>
+</head>
+<body style="margin: 0; padding: 24px 16px; background-color: #ffffff; color: #111111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.6;">
+
+    <div style="max-width: 560px; margin: 0 auto; background-color: #ffffff;">
+
+        <!-- Header Title -->
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 20px 0; color: #000000; border-bottom: 2px solid #000000; padding-bottom: 12px; letter-spacing: -0.2px;">
+            {% if lang == 'nl' %}
+                {% if booking.purchase_type == 'session_pass' %}Strippenkaart bevestigd! ✨{% else %}Abonnement bevestigd! ✨{% endif %}
+            {% elif lang == 'de' %}
+                {% if booking.purchase_type == 'session_pass' %}Mehrfachkarte bestätigt! ✨{% else %}Abonnement bestätigt! ✨{% endif %}
+            {% else %}
+                {% if booking.purchase_type == 'session_pass' %}Session Pass Confirmed! ✨{% else %}Subscription Confirmed! ✨{% endif %}
+            {% endif %}
+        </h2>
+
+        <!-- Greeting & Intro -->
+        {% if lang == 'nl' %}
+            <p style="margin: 0 0 16px 0;">Beste {{ first_name }},</p>
+            {% if booking.purchase_type == 'session_pass' %}
+                <p style="margin: 0 0 16px 0;">Bedankt voor de aankoop van je strippenkaart bij Heaven on Earth! Je betaling is ontvangen en je strippenkaart is geactiveerd.</p>
+                <p style="margin: 0 0 16px 0;">Je strippenkaart is automatisch gekoppeld aan je account. Je kunt nu eenvoudig online je gewenste sessies inplannen.</p>
+            {% else %}
+                <p style="margin: 0 0 16px 0;">Bedankt voor het afsluiten van je abonnement bij Heaven on Earth! Je betaling is ontvangen en je lidmaatschap is direct actief.</p>
+                <p style="margin: 0 0 16px 0;">Je abonnement is automatisch gekoppeld aan je account. Je kunt nu eenvoudig vooruit je sessies inplannen.</p>
+            {% endif %}
+            <h3 style="font-size: 16px; margin: 0 0 8px;">Jouw aankoopgegevens:</h3>
+        {% elif lang == 'de' %}
+            <p style="margin: 0 0 16px 0;">Liebe/r {{ first_name }},</p>
+            {% if booking.purchase_type == 'session_pass' %}
+                <p style="margin: 0 0 16px 0;">vielen Dank für den Kauf deiner Mehrfachkarte bei Heaven on Earth! Deine Zahlung ist eingegangen und deine Karte wurde aktiviert.</p>
+                <p style="margin: 0 0 16px 0;">Deine Karte ist automatisch mit deinem Kundenkonto verknüpft. Du kannst nun ganz bequem online deine Termine buchen.</p>
+            {% else %}
+                <p style="margin: 0 0 16px 0;">vielen Dank für den Abschluss deines Abonnements bei Heaven on Earth! Deine Zahlung ist eingegangen und deine Mitgliedschaft ist ab sofort aktiv.</p>
+                <p style="margin: 0 0 16px 0;">Dein Abonnement ist automatisch mit deinem Kundenkonto verknüpft. Du kannst nun ganz einfach im Voraus deine Termine buchen.</p>
+            {% endif %}
+            <h3 style="font-size: 16px; margin: 0 0 8px;">Deine Kaufdetails:</h3>
+        {% else %}
+            <p style="margin: 0 0 16px 0;">Dear {{ first_name }},</p>
+            {% if booking.purchase_type == 'session_pass' %}
+                <p style="margin: 0 0 16px 0;">Thank you for purchasing your Session Pass at Heaven on Earth! Your payment has been received and your pass is activated.</p>
+                <p style="margin: 0 0 16px 0;">Your pass is automatically linked to your account. You can now conveniently book your sessions online.</p>
+            {% else %}
+                <p style="margin: 0 0 16px 0;">Thank you for your subscription at Heaven on Earth! Your payment has been received and your membership is now active.</p>
+                <p style="margin: 0 0 16px 0;">Your subscription is automatically linked to your account. You can now easily schedule your upcoming sessions in advance.</p>
+            {% endif %}
+            <h3 style="font-size: 16px; margin: 0 0 8px;">Your purchase details:</h3>
+        {% endif %}
+
+        <!-- Purchase Details Table -->
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; border-top: 1px solid #000000; border-bottom: 1px solid #000000;">
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555; width: 45%;">
+                    {% if lang == 'nl' %}Referentienummer:{% elif lang == 'de' %}Referenz-ID:{% else %}Purchase ID:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; font-weight: 700; color: #000000;">
+                    {{ booking.purchase_id }}
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                    {% if lang == 'nl' %}Product:{% elif lang == 'de' %}Produkt:{% else %}Product:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                    {{ booking_type_display }}
+                </td>
+            </tr>
+
+            {% if booking.purchase_type == 'session_pass' %}
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                        {% if lang == 'nl' %}Totaal aantal sessies:{% elif lang == 'de' %}Gesamtsitzungen:{% else %}Total sessions:{% endif %}
+                    </td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                        {{ purchase_info.total_sessions }}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                        {% if lang == 'nl' %}Resterende sessies:{% elif lang == 'de' %}Verbleibende Sitzungen:{% else %}Remaining sessions:{% endif %}
+                    </td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                        {{ purchase_info.remaining_sessions }}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                        {% if lang == 'nl' %}Geldigheid:{% elif lang == 'de' %}Gültigkeit:{% else %}Validity:{% endif %}
+                    </td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                        {% if lang == 'nl' %}Onbeperkt{% elif lang == 'de' %}Unbegrenzt{% else %}{{ purchase_info.validity }}{% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                        {% if lang == 'nl' %}Type abonnement:{% elif lang == 'de' %}Abo-Typ:{% else %}Plan type:{% endif %}
+                    </td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                        {{ purchase_info.plan_type|title }}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                        {% if lang == 'nl' %}Geldigheidsperiode:{% elif lang == 'de' %}Gültigkeitsdauer:{% else %}Active period:{% endif %}
+                    </td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                        {{ purchase_info.validity }}
+                    </td>
+                </tr>
+            {% endif %}
+
+            <tr>
+                <td style="padding: 8px 0; color: #000000; font-weight: 700;">
+                    {% if lang == 'nl' %}Totaal betaald:{% elif lang == 'de' %}Gesamtbetrag bezahlt:{% else %}Total paid:{% endif %}
+                </td>
+                <td style="padding: 8px 0; color: #000000; font-weight: 700;">
+                    € {{ booking.total_price|floatformat:2 }}
+                </td>
+            </tr>
+        </table>
+
+        <!-- Outro -->
+        {% if lang == 'nl' %}
+            <p style="margin: 0 0 16px 0; color: #444444;">Je kunt je sessies en reserveringen op elk moment bekijken en beheren via je persoonlijke dashboard.</p>
+            <p style="margin: 0 0 16px 0; color: #444444;">Heb je nog vragen of speciale wensen? Neem gerust contact met ons op. We helpen je graag.</p>
+            <p style="margin: 0 0 20px 0;">Tot snel bij Heaven on Earth! ✨</p>
+            <p style="margin: 0 0 4px 0;">Met warme groet,</p>
+            <p style="margin: 0 0 16px 0; font-weight: 700;">Team Heaven on Earth</p>
+        {% elif lang == 'de' %}
+            <p style="margin: 0 0 16px 0; color: #444444;">Du kannst deine Sitzungen und Reservierungen jederzeit in deinem Kunden-Dashboard einsehen und verwalten.</p>
+            <p style="margin: 0 0 16px 0; color: #444444;">Hast du noch Fragen oder besondere Wünsche? Kontaktiere uns gerne. Wir helfen dir gerne weiter.</p>
+            <p style="margin: 0 0 20px 0;">Bis bald bei Heaven on Earth! ✨</p>
+            <p style="margin: 0 0 4px 0;">Herzliche Grüße,</p>
+            <p style="margin: 0 0 16px 0; font-weight: 700;">Team Heaven on Earth</p>
+        {% else %}
+            <p style="margin: 0 0 16px 0; color: #444444;">You can view and manage your passes, remaining sessions, and reservations anytime in your customer dashboard.</p>
+            <p style="margin: 0 0 16px 0; color: #444444;">Do you have any questions or special requests? Please feel free to contact us. We are happy to help.</p>
+            <p style="margin: 0 0 20px 0;">See you soon at Heaven on Earth! ✨</p>
+            <p style="margin: 0 0 4px 0;">Warm regards,</p>
+            <p style="margin: 0 0 16px 0; font-weight: 700;">Team Heaven on Earth</p>
+        {% endif %}
+
+        <!-- Dynamic Footer with Contact Details -->
+        <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e5e5; font-size: 13px; color: #444444;">
+            <p style="margin: 0 0 4px 0; font-weight: 700; color: #000000;">Team Heaven on Earth</p>
+            <p style="margin: 0 0 4px 0;">📍 {{ contact_address|default:"Slotweg 1, Egmond aan den Hoef" }}</p>
+            <p style="margin: 0 0 4px 0;">📞 {{ contact_phone|default:"072-3030548" }}</p>
+            {% if contact_email %}
+            <p style="margin: 0;">✉️ {{ contact_email }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+</body>
+</html>
+

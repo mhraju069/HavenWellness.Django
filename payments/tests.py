@@ -144,3 +144,97 @@ class ActivityConfirmationEmailTests(TestCase):
                     self.assertIn(expected['total_paid'], html_message)
                     self.assertIn('€ 45.00', html_message)
                     self.assertIn(expected['plain_total_paid'], sent_email.body)
+
+    def test_multilingual_confirmation_emails_for_all_services(self):
+        with override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend'):
+            with patch('notifications.views.notify_user'), patch('notifications.views.notify_admins'):
+                # 1. VIP Sauna
+                vip_booking = SimpleNamespace(
+                    booking_id='PS-0010',
+                    email='test@example.com',
+                    name='Sophie van Dijk',
+                    user=None,
+                    sauna_type='private',
+                    booking_date=date(2026, 11, 10),
+                    booking_time=time(14, 0),
+                    time_slot='3_hours',
+                    capacity=2,
+                    total_price=Decimal('150.00'),
+                    payment_status='paid',
+                    status='confirmed',
+                    get_feature_names=lambda: ['Badjas & Handdoekenset'],
+                )
+                res_nl = send_booking_confirmation_email(vip_booking, lang='nl')
+                self.assertTrue(res_nl['status'])
+                mail_nl = mail.outbox[-1]
+                self.assertIn("Een heerlijk moment van ontspanning wacht op je!", mail_nl.subject)
+                self.assertIn("VIP Sauna", mail_nl.alternatives[0][0])
+                self.assertIn("PS-0010", mail_nl.alternatives[0][0])
+                self.assertIn("Badjas &amp; Handdoekenset", mail_nl.alternatives[0][0])
+
+                # 2. Shared Sauna
+                sauna_booking = SimpleNamespace(
+                    booking_id='SS-0020',
+                    email='test@example.com',
+                    name='Jan de Boer',
+                    user=None,
+                    sauna_type='shared',
+                    booking_date=date(2026, 11, 12),
+                    booking_time=time(10, 0),
+                    time_slot='90_mins',
+                    capacity=1,
+                    total_price=Decimal('35.00'),
+                    payment_status='paid',
+                    status='confirmed',
+                    get_feature_names=lambda: [],
+                )
+                res_sauna = send_booking_confirmation_email(sauna_booking, lang='nl')
+                self.assertTrue(res_sauna['status'])
+                mail_sauna = mail.outbox[-1]
+                self.assertIn("Jouw moment van ontspanning is gereserveerd!", mail_sauna.subject)
+                self.assertIn("badkleding verplicht", mail_sauna.alternatives[0][0])
+                self.assertIn("90 minuten", mail_sauna.alternatives[0][0])
+
+                # 3. Salt Room
+                salt_booking = SimpleNamespace(
+                    booking_id='SR-0030',
+                    email='test@example.com',
+                    name='Emma Jansen',
+                    user=None,
+                    date=date(2026, 11, 15),
+                    start_time=time(11, 0),
+                    end_time=time(11, 45),
+                    capacity=2,
+                    total_price=Decimal('40.00'),
+                    payment_status='paid',
+                    status='confirmed',
+                    used_pass=False,
+                    used_subscription=False,
+                )
+                res_salt = send_booking_confirmation_email(salt_booking, lang='nl')
+                self.assertTrue(res_salt['status'])
+                mail_salt = mail.outbox[-1]
+                self.assertIn("Ontdek de bijzondere ervaring van halotherapie!", mail_salt.subject)
+                self.assertIn("Zoutkamer & Halotherapie", mail_salt.alternatives[0][0])
+                self.assertIn("10 minuten voor aanvang", mail_salt.alternatives[0][0])
+
+                # 4. Package
+                pkg_booking = SimpleNamespace(
+                    booking_id='PKG-0040',
+                    email='test@example.com',
+                    name='Lucas Bakker',
+                    user=None,
+                    date=date(2026, 11, 20),
+                    guests=2,
+                    total_price=Decimal('220.00'),
+                    payment_status='paid',
+                    status='confirmed',
+                    booked_services_ids=[{'private_sauna': 'PS-0010'}, {'lunchroom': 'LR-0005'}],
+                    is_custom=False,
+                )
+                res_pkg = send_booking_confirmation_email(pkg_booking, lang='nl')
+                self.assertTrue(res_pkg['status'])
+                mail_pkg = mail.outbox[-1]
+                self.assertIn("Wat leuk dat je bij ons komt genieten!", mail_pkg.subject)
+                self.assertIn("PKG-0040", mail_pkg.alternatives[0][0])
+                self.assertIn("Inbegrepen activiteiten en tijden:", mail_pkg.alternatives[0][0])

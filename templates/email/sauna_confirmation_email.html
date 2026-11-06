@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="{{ lang|default:'nl' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        {% if lang == 'nl' %}
+            Jouw moment van ontspanning is gereserveerd! ✨ - Heaven on Earth
+        {% elif lang == 'de' %}
+            Dein Moment der Entspannung ist reserviert! ✨ - Heaven on Earth
+        {% else %}
+            Your moment of relaxation is reserved! ✨ - Heaven on Earth
+        {% endif %}
+    </title>
+</head>
+<body style="margin: 0; padding: 24px 16px; background-color: #ffffff; color: #111111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.6;">
+
+    <div style="max-width: 560px; margin: 0 auto; background-color: #ffffff;">
+
+        <!-- Header Title -->
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 20px 0; color: #000000; border-bottom: 2px solid #000000; padding-bottom: 12px; letter-spacing: -0.2px;">
+            {% if lang == 'nl' %}
+                Jouw moment van ontspanning is gereserveerd! ✨
+            {% elif lang == 'de' %}
+                Dein Moment der Entspannung ist reserviert! ✨
+            {% else %}
+                Your moment of relaxation is reserved! ✨
+            {% endif %}
+        </h2>
+
+        <!-- Greeting & Intro -->
+        {% if lang == 'nl' %}
+            <p style="margin: 0 0 16px 0;">Beste {{ first_name }},</p>
+            <p style="margin: 0 0 16px 0;">Wat leuk dat je binnenkort bij ons komt genieten!</p>
+            <p style="margin: 0 0 16px 0;">Je betaling is ontvangen en je reservering voor onze sauna is bevestigd.</p>
+            <p style="margin: 0 0 16px 0;">Laat de dagelijkse drukte even achter je en geniet van een heerlijk moment van rust, warmte en ontspanning.</p>
+            <h3 style="font-size: 16px; margin: 0 0 8px;">Jouw reserveringsgegevens:</h3>
+        {% elif lang == 'de' %}
+            <p style="margin: 0 0 16px 0;">Liebe/r {{ first_name }},</p>
+            <p style="margin: 0 0 16px 0;">wie schön, dass du uns bald besuchen und genießen wirst!</p>
+            <p style="margin: 0 0 16px 0;">Deine Zahlung ist eingegangen und deine Reservierung für unsere Sauna ist bestätigt.</p>
+            <p style="margin: 0 0 16px 0;">Lass die Hektik des Alltags hinter dir und genieße einen herrlichen Moment der Ruhe, Wärme und Entspannung.</p>
+            <h3 style="font-size: 16px; margin: 0 0 8px;">Deine Reservierungsdetails:</h3>
+        {% else %}
+            <p style="margin: 0 0 16px 0;">Dear {{ first_name }},</p>
+            <p style="margin: 0 0 16px 0;">How lovely that you are coming to enjoy your time with us soon!</p>
+            <p style="margin: 0 0 16px 0;">Your payment has been received and your reservation for our sauna is confirmed.</p>
+            <p style="margin: 0 0 16px 0;">Leave the daily hustle and bustle behind and indulge in a wonderful moment of peace, warmth, and relaxation.</p>
+            <h3 style="font-size: 16px; margin: 0 0 8px;">Your reservation details:</h3>
+        {% endif %}
+
+        <!-- Booking Details Table -->
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; border-top: 1px solid #000000; border-bottom: 1px solid #000000;">
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555; width: 40%;">
+                    {% if lang == 'nl' %}Reserveringsnummer:{% elif lang == 'de' %}Reservierungsnummer:{% else %}Booking number:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; font-weight: 700; color: #000000;">
+                    {{ booking.booking_id }}
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                    {% if lang == 'nl' %}Ervaring:{% elif lang == 'de' %}Erlebnis:{% else %}Experience:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                    Sauna
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                    {% if lang == 'nl' %}Datum:{% elif lang == 'de' %}Datum:{% else %}Date:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                    {{ booking_date_display }}
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                    {% if lang == 'nl' %}Tijd:{% elif lang == 'de' %}Uhrzeit:{% else %}Time:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                    {{ booking_time_display }}
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                    {% if lang == 'nl' %}Duur:{% elif lang == 'de' %}Dauer:{% else %}Duration:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                    {% if duration_display %}{{ duration_display }}{% else %}90 minuten{% endif %}
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                    {% if lang == 'nl' %}Aantal personen:{% elif lang == 'de' %}Anzahl der Personen:{% else %}Number of guests:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                    {{ guests_count_display }}
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 8px 0; color: #000000; font-weight: 700;">
+                    {% if lang == 'nl' %}Totaal betaald:{% elif lang == 'de' %}Gesamtbetrag bezahlt:{% else %}Total paid:{% endif %}
+                </td>
+                <td style="padding: 8px 0; color: #000000; font-weight: 700;">
+                    {% if is_paid_with_package %}
+                        {% if lang == 'nl' %}Inbegrepen in arrangement{% elif lang == 'de' %}Im Arrangement enthalten{% else %}Included in package{% endif %}
+                    {% else %}
+                        € {{ booking.total_price|floatformat:2 }}
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+
+        <!-- Good to know section -->
+        <h3 style="font-size: 16px; font-weight: 700; margin: 20px 0 10px 0; color: #000000;">
+            {% if lang == 'nl' %}
+                Goed om te weten
+            {% elif lang == 'de' %}
+                Gut zu wissen
+            {% else %}
+                Good to know
+            {% endif %}
+        </h3>
+
+        {% if lang == 'nl' %}
+            <p style="margin: 0 0 12px 0; color: #444444;">We vragen je om 15 minuten voor aanvang aanwezig te zijn, zodat je rustig kunt aankomen.</p>
+            <p style="margin: 0 0 16px 0; color: #444444;">In onze sauna is het dragen van badkleding verplicht. Vergeet daarom niet je badkleding, handdoek en slippers mee te nemen.</p>
+            <p style="margin: 0 0 16px 0; color: #444444;">Heb je nog vragen of speciale wensen? Neem gerust contact met ons op. We helpen je graag.</p>
+            <p style="margin: 0 0 20px 0;">We kijken ernaar uit je te verwelkomen bij Heaven on Earth! ✨</p>
+            <p style="margin: 0 0 4px 0;">Met warme groet,</p>
+            <p style="margin: 0 0 16px 0; font-weight: 700;">Team Heaven on Earth</p>
+        {% elif lang == 'de' %}
+            <p style="margin: 0 0 12px 0; color: #444444;">Wir bitten dich, 15 Minuten vor Beginn einzutreffen, damit du ganz entspannt ankommen kannst.</p>
+            <p style="margin: 0 0 16px 0; color: #444444;">In unserer Sauna ist das Tragen von Badebekleidung Pflicht. Bitte denke daran, Badebekleidung, Handtuch und Badeschlappen mitzubringen.</p>
+            <p style="margin: 0 0 16px 0; color: #444444;">Hast du noch Fragen oder besondere Wünsche? Kontaktiere uns gerne. Wir helfen dir gerne weiter.</p>
+            <p style="margin: 0 0 20px 0;">Wir freuen uns darauf, dich bei Heaven on Earth willkommen zu heißen! ✨</p>
+            <p style="margin: 0 0 4px 0;">Herzliche Grüße,</p>
+            <p style="margin: 0 0 16px 0; font-weight: 700;">Team Heaven on Earth</p>
+        {% else %}
+            <p style="margin: 0 0 12px 0; color: #444444;">We kindly ask you to arrive 15 minutes before your scheduled start time so you can settle in comfortably.</p>
+            <p style="margin: 0 0 16px 0; color: #444444;">Wearing swimwear is mandatory in our sauna. Please don't forget to bring your swimwear, towel, and slippers.</p>
+            <p style="margin: 0 0 16px 0; color: #444444;">Do you have any questions or special requests? Please don't hesitate to contact us. We are happy to help.</p>
+            <p style="margin: 0 0 20px 0;">We look forward to welcoming you to Heaven on Earth! ✨</p>
+            <p style="margin: 0 0 4px 0;">Warm regards,</p>
+            <p style="margin: 0 0 16px 0; font-weight: 700;">Team Heaven on Earth</p>
+        {% endif %}
+
+        <!-- Dynamic Footer with Contact Details -->
+        <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e5e5; font-size: 13px; color: #444444;">
+            <p style="margin: 0 0 4px 0; font-weight: 700; color: #000000;">Team Heaven on Earth</p>
+            <p style="margin: 0 0 4px 0;">📍 {{ contact_address|default:"Slotweg 1, Egmond aan den Hoef" }}</p>
+            <p style="margin: 0 0 4px 0;">📞 {{ contact_phone|default:"072-3030548" }}</p>
+            {% if contact_email %}
+            <p style="margin: 0;">✉️ {{ contact_email }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+</body>
+</html>
+

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="{{ lang|default:'nl' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        {% if lang == 'nl' %}
+            Een heerlijk moment van ontspanning wacht op je! ✨ - Heaven on Earth
+        {% elif lang == 'de' %}
+            Ein herrlicher Moment der Entspannung wartet auf dich! ✨ - Heaven on Earth
+        {% else %}
+            A wonderful moment of relaxation awaits you! ✨ - Heaven on Earth
+        {% endif %}
+    </title>
+</head>
+<body style="margin: 0; padding: 24px 16px; background-color: #ffffff; color: #111111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.6;">
+
+    <div style="max-width: 560px; margin: 0 auto; background-color: #ffffff;">
+
+        <!-- Header Title -->
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 20px 0; color: #000000; border-bottom: 2px solid #000000; padding-bottom: 12px; letter-spacing: -0.2px;">
+            {% if lang == 'nl' %}
+                Een heerlijk moment van ontspanning wacht op je! ✨
+            {% elif lang == 'de' %}
+                Ein herrlicher Moment der Entspannung wartet auf dich! ✨
+            {% else %}
+                A wonderful moment of relaxation awaits you! ✨
+            {% endif %}
+        </h2>
+
+        <!-- Greeting & Intro -->
+        {% if lang == 'nl' %}
+            <p style="margin: 0 0 16px 0;">Beste {{ first_name }},</p>
+            <p style="margin: 0 0 16px 0;">Wat leuk dat je hebt gekozen voor onze VIP Sauna bij Heaven on Earth!</p>
+            <p style="margin: 0 0 16px 0;">Je betaling is ontvangen en je reservering is bevestigd. Binnenkort is het tijd om even helemaal tot rust te komen en te genieten van een moment voor jezelf en je gezelschap.</p>
+            <h3 style="font-size: 16px; margin: 0 0 8px;">Jouw reserveringsgegevens:</h3>
+        {% elif lang == 'de' %}
+            <p style="margin: 0 0 16px 0;">Liebe/r {{ first_name }},</p>
+            <p style="margin: 0 0 16px 0;">wie schön, dass du dich für unsere VIP Sauna bei Heaven on Earth entschieden hast!</p>
+            <p style="margin: 0 0 16px 0;">Deine Zahlung ist eingegangen und deine Reservierung ist bestätigt. Bald ist es Zeit, vollkommen zur Ruhe zu kommen und einen Moment für dich und deine Begleitung zu genießen.</p>
+            <h3 style="font-size: 16px; margin: 0 0 8px;">Deine Reservierungsdetails:</h3>
+        {% else %}
+            <p style="margin: 0 0 16px 0;">Dear {{ first_name }},</p>
+            <p style="margin: 0 0 16px 0;">How wonderful that you have chosen our VIP Sauna at Heaven on Earth!</p>
+            <p style="margin: 0 0 16px 0;">Your payment has been received and your reservation is confirmed. Soon it will be time to completely unwind and enjoy a moment for yourself and your company.</p>
+            <h3 style="font-size: 16px; margin: 0 0 8px;">Your reservation details:</h3>
+        {% endif %}
+
+        <!-- Booking Details Table -->
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; border-top: 1px solid #000000; border-bottom: 1px solid #000000;">
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555; width: 40%;">
+                    {% if lang == 'nl' %}Reserveringsnummer:{% elif lang == 'de' %}Reservierungsnummer:{% else %}Booking number:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; font-weight: 700; color: #000000;">
+                    {{ booking.booking_id }}
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                    {% if lang == 'nl' %}Ervaring:{% elif lang == 'de' %}Erlebnis:{% else %}Experience:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                    VIP Sauna
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                    {% if lang == 'nl' %}Datum:{% elif lang == 'de' %}Datum:{% else %}Date:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                    {{ booking_date_display }}
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                    {% if lang == 'nl' %}Tijd:{% elif lang == 'de' %}Uhrzeit:{% else %}Time:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                    {{ booking_time_display }}
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                    {% if lang == 'nl' %}Aantal personen:{% elif lang == 'de' %}Anzahl der Personen:{% else %}Number of guests:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                    {{ guests_count_display }}
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #555555;">
+                    {% if lang == 'nl' %}Extra's:{% elif lang == 'de' %}Extras:{% else %}Add-ons:{% endif %}
+                </td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e5e5e5; color: #000000;">
+                    {% if booking.get_feature_names %}
+                        {% for f in booking.get_feature_names %}
+                            {{ f }}{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        {% if lang == 'nl' %}Geen{% elif lang == 'de' %}Keine{% else %}None{% endif %}
+                    {% endif %}
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 8px 0; color: #000000; font-weight: 700;">
+                    {% if lang == 'nl' %}Totaal betaald:{% elif lang == 'de' %}Gesamtbetrag bezahlt:{% else %}Total paid:{% endif %}
+                </td>
+                <td style="padding: 8px 0; color: #000000; font-weight: 700;">
+                    {% if is_paid_with_package %}
+                        {% if lang == 'nl' %}Inbegrepen in arrangement{% elif lang == 'de' %}Im Arrangement enthalten{% else %}Included in package{% endif %}
+                    {% else %}
+                        € {{ booking.total_price|floatformat:2 }}
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+
+        <!-- Outro & Privacy info -->
+        {% if lang == 'nl' %}
+            <p style="margin: 0 0 16px 0;">Tijdens je bezoek geniet je in alle privacy van onze sfeervolle sauna en heerlijke faciliteiten. Alles staat voor je klaar om er een ontspannen ervaring van te maken.</p>
+            <p style="margin: 0 0 16px 0; color: #444444;">Heb je nog vragen of speciale wensen? Neem gerust contact met ons op. We helpen je graag.</p>
+            <p style="margin: 0 0 20px 0;">We kijken ernaar uit je te verwelkomen bij Heaven on Earth! ✨</p>
+            <p style="margin: 0 0 4px 0;">Met warme groet,</p>
+            <p style="margin: 0 0 16px 0; font-weight: 700;">Team Heaven on Earth</p>
+        {% elif lang == 'de' %}
+            <p style="margin: 0 0 16px 0;">Während deines Besuchs genießt du in vollkommener Privatsphäre unsere stimmungsvolle Sauna und die wunderbaren Einrichtungen. Alles steht für dich bereit, um deinen Aufenthalt zu einem entspannenden Erlebnis zu machen.</p>
+            <p style="margin: 0 0 16px 0; color: #444444;">Hast du noch Fragen oder besondere Wünsche? Kontaktiere uns gerne. Wir helfen dir gerne weiter.</p>
+            <p style="margin: 0 0 20px 0;">Wir freuen uns darauf, dich bei Heaven on Earth willkommen zu heißen! ✨</p>
+            <p style="margin: 0 0 4px 0;">Herzliche Grüße,</p>
+            <p style="margin: 0 0 16px 0; font-weight: 700;">Team Heaven on Earth</p>
+        {% else %}
+            <p style="margin: 0 0 16px 0;">During your visit, you will enjoy our atmospheric sauna and wonderful facilities in complete privacy. Everything is ready for you to have a relaxing experience.</p>
+            <p style="margin: 0 0 16px 0; color: #444444;">Do you have any questions or special requests? Please feel free to contact us. We are happy to help.</p>
+            <p style="margin: 0 0 20px 0;">We look forward to welcoming you to Heaven on Earth! ✨</p>
+            <p style="margin: 0 0 4px 0;">Warm regards,</p>
+            <p style="margin: 0 0 16px 0; font-weight: 700;">Team Heaven on Earth</p>
+        {% endif %}
+
+        <!-- Dynamic Footer with Contact Details -->
+        <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e5e5; font-size: 13px; color: #444444;">
+            <p style="margin: 0 0 4px 0; font-weight: 700; color: #000000;">Team Heaven on Earth</p>
+            <p style="margin: 0 0 4px 0;">📍 {{ contact_address|default:"Slotweg 1, Egmond aan den Hoef" }}</p>
+            <p style="margin: 0 0 4px 0;">📞 {{ contact_phone|default:"072-3030548" }}</p>
+            {% if contact_email %}
+            <p style="margin: 0;">✉️ {{ contact_email }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+</body>
+</html>
+
