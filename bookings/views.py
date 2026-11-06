@@ -71,6 +71,64 @@ class LunchroomBookingAPIView(generics.ListCreateAPIView):
     queryset = LunchroomBooking.objects.all().order_by('-created_at')
 
     def create(self, request, *args, **kwargs):
+        # 1. Enforce minimum tomorrow booking date policy (No same-day online reservations)
+        booking_date_raw = request.data.get('booking_date')
+        if booking_date_raw:
+            try:
+                import zoneinfo
+                from datetime import datetime, date
+                ams_tz = zoneinfo.ZoneInfo("Europe/Amsterdam")
+                today_ams = datetime.now(ams_tz).date()
+                if isinstance(booking_date_raw, str):
+                    parsed_date = datetime.strptime(booking_date_raw.strip()[:10], "%Y-%m-%d").date()
+                elif isinstance(booking_date_raw, date):
+                    parsed_date = booking_date_raw
+                else:
+                    parsed_date = None
+
+                if parsed_date and parsed_date <= today_ams:
+                    req_lang = (
+                        request.query_params.get('lang') or
+                        request.headers.get('Accept-Language') or
+                        request.headers.get('lang') or
+                        'en'
+                    ).lower()
+
+                    if 'nl' in req_lang:
+                        same_day_msg = (
+                            "Vandaag nog gezellig langskomen? ✨\n"
+                            "Wil je voor vandaag reserveren? Bel of WhatsApp ons om te vragen of er nog plek is.\n"
+                            "📞 072-3030548 (WhatsApp: https://wa.me/31723030548)\n"
+                            "We verwelkomen je graag bij Heaven on Earth!"
+                        )
+                    elif 'de' in req_lang:
+                        same_day_msg = (
+                            "Heute noch bei uns vorbeischauen? ✨\n"
+                            "Möchtest du für heute reservieren? Ruf uns an oder schreib uns auf WhatsApp, um die Verfügbarkeit zu prüfen.\n"
+                            "📞 072-3030548 (WhatsApp: https://wa.me/31723030548)\n"
+                            "Wir freuen uns darauf, dich bei Heaven on Earth willkommen zu heißen!"
+                        )
+                    else:
+                        same_day_msg = (
+                            "Planning to visit us today? ✨\n"
+                            "To reserve for today, call or WhatsApp us to check if a table is available.\n"
+                            "📞 072-3030548 (WhatsApp: https://wa.me/31723030548)\n"
+                            "We look forward to welcoming you to Heaven on Earth!"
+                        )
+
+                    return Response({
+                        "success": False,
+                        "code": "SAME_DAY_NOT_ALLOWED",
+                        "error": same_day_msg,
+                        "message": same_day_msg,
+                        "contact": {
+                            "phone": "072-3030548",
+                            "whatsapp": "https://wa.me/31723030548"
+                        }
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                print("Lunchroom same-day validation error:", e)
+
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         booking = serializer.save(status='confirmed')
