@@ -1,0 +1,32 @@
+name: Deploy Backend to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            cd ${{ secrets.VPS_PROJECT_PATH }}
+            git reset --hard
+            git clean -fd
+            git fetch origin main
+            git reset --hard origin/main
+            
+            # Zero-downtime rebuild and cleanup
+            docker compose up --build -d --remove-orphans
+            docker image prune -f
+            
+            echo "Backend deployed successfully!"
