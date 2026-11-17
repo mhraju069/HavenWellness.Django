@@ -30,6 +30,7 @@ channels-redis
 # Background Tasks
 celery
 redis
+packaging
 
 # Utilities
 requests==2.34.2
