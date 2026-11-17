@@ -46,7 +46,7 @@ services:
       - ./media:/app/media
       # - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
-      - web
+      - backend
     restart: always
 
   redis:
@@ -73,7 +73,7 @@ services:
     depends_on:
       - redis
       - db
-      - web
+      - backend
     restart: always
 
   celery_beat:
@@ -93,7 +93,7 @@ services:
     depends_on:
       - redis
       - db
-      - web
+      - backend
     restart: always
 
 volumes:
