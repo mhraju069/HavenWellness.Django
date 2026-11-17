@@ -70,7 +70,7 @@ class PrivateSauna(models.Model):
 
 class PrivateSaunaFeatures(models.Model):
     sauna = models.ForeignKey(PrivateSauna, on_delete=models.CASCADE, related_name='features')
-    feature = models.CharField(max_length=100)
+    feature = models.CharField(max_length=500)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -92,7 +92,7 @@ class SharedSauna(models.Model):
 
 class SharedSaunaFeatures(models.Model):
     sauna = models.ForeignKey(SharedSauna, on_delete=models.CASCADE, related_name='features')
-    feature = models.CharField(max_length=100)
+    feature = models.CharField(max_length=500)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -102,13 +102,13 @@ class SharedSaunaFeatures(models.Model):
 
 
 class Activities(models.Model):
-    title = models.CharField(max_length=100)
+    title = models.CharField(max_length=255)
     description = models.TextField()
     date = models.DateField(null=True, blank=True)
     open_time = models.TimeField(null=True, blank=True)
     close_time = models.TimeField(null=True, blank=True)
     capacity = models.PositiveIntegerField(default=1)
-    host = models.CharField(max_length=100, default="")
+    host = models.CharField(max_length=255, default="")
     additional_notes = models.TextField(null=True, blank=True)
     images = models.ImageField(upload_to="activity_session", null=True, blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -122,15 +122,15 @@ class Activities(models.Model):
 
 class ActivitiesFeature(models.Model):
     activity = models.ForeignKey(Activities, on_delete=models.CASCADE, related_name='features')
-    feature = models.CharField(max_length=100)
+    feature = models.CharField(max_length=500)
 
     def __str__(self):
         return f"{self.feature}"
 
 
 class Lunchroom(models.Model):
-    title = models.CharField(max_length=100)
-    subtitle = models.CharField(max_length=100, default="")
+    title = models.CharField(max_length=255)
+    subtitle = models.CharField(max_length=500, default="")
     description = models.TextField()
     images = models.ImageField(upload_to="lunchroom", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -141,8 +141,8 @@ class Lunchroom(models.Model):
 
 
 class Saltroom(models.Model):
-    title = models.CharField(max_length=100)
-    subtitle = models.CharField(max_length=100, default="")
+    title = models.CharField(max_length=255)
+    subtitle = models.CharField(max_length=500, default="")
     description = models.TextField()
     max_capacity = models.PositiveIntegerField(default=2)
     images = models.ImageField(upload_to="saltroom", null=True, blank=True)
@@ -158,7 +158,7 @@ class Saltroom(models.Model):
 
 class SaltroomFeatures(models.Model):
     saltroom = models.ForeignKey(Saltroom, on_delete=models.CASCADE, related_name='features')
-    feature = models.CharField(max_length=100)
+    feature = models.CharField(max_length=500)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -174,7 +174,7 @@ class Packages(models.Model):
         ('activity', 'Activity'),
         ('lunchroom', 'Lunchroom'),
     ]
-    title = models.CharField(max_length=100)
+    title = models.CharField(max_length=255)
     packages = models.JSONField(default=list, blank=True, help_text="List of included service types, e.g. ['private_sauna', 'lunchroom']")
     description = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -188,14 +188,14 @@ class Packages(models.Model):
 
 class PackageFeatures(models.Model):
     package = models.ForeignKey(Packages, on_delete=models.CASCADE, related_name='features')
-    feature = models.CharField(max_length=100)
+    feature = models.CharField(max_length=500)
 
     def __str__(self):
         return f" {self.package.title} | {self.feature}"
 
 
 class ServiceFeature(models.Model):
-    feature = models.CharField(max_length=100)
+    feature = models.CharField(max_length=500)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
