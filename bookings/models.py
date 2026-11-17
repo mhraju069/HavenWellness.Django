@@ -40,9 +40,9 @@ class SaunaBooking(models.Model):
     capacity = models.PositiveIntegerField(default=1, help_text="Capacity / guest count")
 
     # Guest details (Must be required)
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=255)
     email = models.EmailField()
-    phone = models.CharField(max_length=20)
+    phone = models.CharField(max_length=100)
 
     # Special request / comment (Nullable)
     special_request = models.TextField(null=True, blank=True)
@@ -123,17 +123,17 @@ class LunchroomBooking(models.Model):
     booking_time = models.TimeField()
     capacity = models.PositiveIntegerField(default=1, help_text="Capacity / guest count")
     
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=255)
     email = models.EmailField()
-    phone = models.CharField(max_length=20)
+    phone = models.CharField(max_length=100)
     special_request = models.TextField(null=True, blank=True)
 
     #Celebration
-    celebration_type = models.CharField(max_length=20, null=True, blank=True)
+    celebration_type = models.CharField(max_length=100, null=True, blank=True)
     celebration_date = models.DateField(null=True, blank=True)
-    name_of_celebrant = models.CharField(max_length=100, null=True, blank=True)
+    name_of_celebrant = models.CharField(max_length=255, null=True, blank=True)
     age_of_celebrant = models.PositiveIntegerField(null=True, blank=True)
-    hobbies = models.CharField(max_length=100, null=True, blank=True)
+    hobbies = models.CharField(max_length=255, null=True, blank=True)
     celebration_details = models.TextField(null=True, blank=True)
 
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='confirmed')
@@ -173,13 +173,13 @@ class ActivityBooking(models.Model):
     activity = models.ForeignKey(Activities, on_delete=models.CASCADE, related_name='activity_bookings')
     capacity = models.PositiveIntegerField(default=1, help_text="Capacity / guest count")
     
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=255)
     email = models.EmailField()
-    phone = models.CharField(max_length=20)
+    phone = models.CharField(max_length=100)
     special_request = models.TextField(null=True, blank=True)
 
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='confirmed')
-    payment_status = models.CharField(max_length=30, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='confirmed')
+    payment_status = models.CharField(max_length=50, choices=PAYMENT_STATUS_CHOICES, default='pending')
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -213,9 +213,9 @@ class EventBooking(models.Model):
     music_preference = models.TextField(null=True, blank=True, help_text="Music preference")
     notes = models.TextField(null=True, blank=True)
 
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=255)
     email = models.EmailField()
-    phone = models.CharField(max_length=20)
+    phone = models.CharField(max_length=100)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -259,9 +259,9 @@ class PackageBooking(models.Model):
     booked_services_ids = models.JSONField(default=list, help_text="List of included service ids, e.g. [{'private_sauna':'PS-001'}, {'lunchroom':'LR-001'}]")
     service_names = models.JSONField(default=list, blank=True, help_text="List of service names for custom packages, e.g. ['VIP Sauna', 'Sauna', 'Lunchroom', 'Yoga Activity']")
 
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=255)
     email = models.EmailField()
-    phone = models.CharField(max_length=20)
+    phone = models.CharField(max_length=100)
 
     is_custom = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -296,9 +296,9 @@ class SaltRoomBooking(models.Model):
     booking_id = models.CharField(max_length=100, editable=False, db_index=True)
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='saltroom_bookings')
 
-    name = models.CharField(max_length=100, default="")
+    name = models.CharField(max_length=255, default="")
     email = models.EmailField(default="")
-    phone = models.CharField(max_length=20, default="", blank=True)
+    phone = models.CharField(max_length=100, default="", blank=True)
     special_request = models.TextField(null=True, blank=True)
 
     date = models.DateField(db_index=True)

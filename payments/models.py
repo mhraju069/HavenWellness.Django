@@ -115,9 +115,9 @@ class ClientPurchase(models.Model):
     session_pass = models.ForeignKey(SessionPass, on_delete=models.SET_NULL, null=True, blank=True, related_name='purchases')
     subscription_plan = models.ForeignKey(SubscriptionPlans, on_delete=models.SET_NULL, null=True, blank=True, related_name='purchases')
 
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=255)
     email = models.EmailField()
-    phone = models.CharField(max_length=20, null=True, blank=True)
+    phone = models.CharField(max_length=100, null=True, blank=True)
 
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     currency = models.CharField(max_length=10, default='eur')
