@@ -8,13 +8,32 @@ services:
       - .:/app
     expose:
       - "8000"
-    depends_on:
-      - redis
+    env_file:
+      - .env
     environment:
       - DJANGO_SETTINGS_MODULE=core.settings
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - DB_HOST=db
+    depends_on:
+      - redis
+      - db
     restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: db
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${DB_NAME:-haven_wellness}
+      POSTGRES_USER: ${DB_USER:-maggy}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-maggy@321}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
   nginx:
     image: nginx:stable
@@ -44,12 +63,16 @@ services:
     volumes:
       - .:/app
     working_dir: /app
+    env_file:
+      - .env
     environment:
       - DJANGO_SETTINGS_MODULE=core.settings
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - DB_HOST=db
     depends_on:
       - redis
+      - db
       - web
     restart: always
 
@@ -60,12 +83,18 @@ services:
     volumes:
       - .:/app
     working_dir: /app
+    env_file:
+      - .env
     environment:
       - DJANGO_SETTINGS_MODULE=core.settings
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - DB_HOST=db
     depends_on:
       - redis
+      - db
       - web
     restart: always
 
+volumes:
+  postgres_data:
