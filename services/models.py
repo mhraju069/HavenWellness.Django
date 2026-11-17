@@ -13,8 +13,8 @@ class Services(models.Model):
         ('event', 'Event'),
         ('lunchroom', 'Lunchroom'),
     ]
-    title = models.CharField(max_length=100)
-    subtitle = models.CharField(max_length=100, default="")
+    title = models.CharField(max_length=250)
+    subtitle = models.CharField(max_length=500, default="")
     description = models.TextField()
     type = models.CharField(max_length=100, choices=SERVICE_TYPES)
     image = models.ImageField(upload_to="services", null=True, blank=True)  
